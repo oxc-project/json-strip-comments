@@ -1,13 +1,3 @@
-# JSON Strip Comments
-
-A fork of a fork for stripping JSON comments and trailing commas in place:
-
-* https://github.com/tmccombs/json-comments-rs
-* https://github.com/parcel-bundler/parcel/pull/9032
-
-## Example
-
-```rust
 use serde_json::Value;
 
 fn main() {
@@ -28,4 +18,3 @@ fn main() {
 
     println!("{value}");
 }
-```
