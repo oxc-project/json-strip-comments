@@ -2,8 +2,8 @@
 //!
 //! A fork of a fork:
 //!
-//! * https://github.com/tmccombs/json-comments-rs
-//! * https://github.com/parcel-bundler/parcel/pull/9032
+//! * <https://github.com/tmccombs/json-comments-rs>
+//! * <https://github.com/parcel-bundler/parcel/pull/9032>
 //!
 //! `json-strip-comments` is a library to strip out comments from JSON. By processing text
 //! through a [`StripComments`] adapter first, it is possible to use a standard JSON parser (such
