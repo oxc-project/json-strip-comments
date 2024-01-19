@@ -2,3 +2,6 @@
 name = "json-strip-comments"
 version = "0.0.1"
 edition = "2021"
+
+[dev-dependencies]
+serde_json = "1.0.111"
