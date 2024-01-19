@@ -1,5 +1,13 @@
 # JSON Strip Comments
 
+[![Crates.io][crates-badge]][crates-url]
+[![Docs.rs][docs-badge]][docs-url]
+
+[crates-badge]: https://img.shields.io/crates/d/json-strip-comments?label=crates.io
+[crates-url]: https://crates.io/crates/json-strip-comments
+[docs-badge]: https://img.shields.io/docsrs/json-strip-comments
+[docs-url]: https://docs.rs/json-strip-comments
+
 A fork of a fork for stripping JSON comments and trailing commas in place:
 
 * https://github.com/tmccombs/json-comments-rs
