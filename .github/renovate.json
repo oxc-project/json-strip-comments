@@ -1,10 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":disableDependencyDashboard"],
-  "schedule": ["before 8am on monday"],
-  "automerge": true,
-  "assignees": ["@Boshen"],
-  "lockFileMaintenance": {
-    "enabled": true
-  }
+  "extends": ["github>Boshen/renovate"],
+  "packageRules": [
+    {
+      "groupName": "rust crates",
+      "matchManagers": ["cargo"]
+    }
+  ]
 }
