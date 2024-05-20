@@ -25,6 +25,7 @@ jobs:
       - uses: moonrepo/setup-rust@v1
         with:
           cache-base: main
+          components: clippy
 
       - run: cargo check
 
