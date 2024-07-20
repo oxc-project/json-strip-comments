@@ -1,6 +1,6 @@
 [package]
 name = "json-strip-comments"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 description = "Strip comments from JSON"
 license = "MIT"
