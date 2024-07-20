@@ -22,13 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: taiki-e/checkout-action@v1
-
-      - uses: moonrepo/setup-rust@v1
+      - uses: Boshen/setup-rust@main
         with:
-          cache-base: main
+          save-cache: ${{ github.ref_name == 'main' }}
           components: clippy
-
       - run: cargo check
-
       - run: cargo clippy
-
+      - run: RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --document-private-items
