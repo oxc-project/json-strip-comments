@@ -130,7 +130,7 @@ fn consume_comment_whitespace_until_maybe_bracket(
     it: &mut IterMut<u8>,
     settings: CommentSettings,
 ) -> Result<bool> {
-    for c in it.by_ref() {
+    while let Some(c) = it.next() {
         *state = match state {
             Top => {
                 *state = top(c, settings);
@@ -142,9 +142,9 @@ fn consume_comment_whitespace_until_maybe_bracket(
             InString => in_string(*c),
             StringEscape => InString,
             InComment => in_comment(c, settings)?,
-            InBlockComment => in_block_comment(c),
+            InBlockComment => consume_block_comments(it),
             MaybeCommentEnd => maybe_comment_end(c),
-            InLineComment => in_line_comment(c),
+            InLineComment => consume_line_comments(it),
         };
     }
     Ok(false)
@@ -174,11 +174,47 @@ fn strip_buf(
                 InComment => in_comment(c, settings)?,
                 InBlockComment => in_block_comment(c),
                 MaybeCommentEnd => maybe_comment_end(c),
-                InLineComment => in_line_comment(c),
+                InLineComment => {
+                    if *c == b'\n' {
+                        Top
+                    } else {
+                        *c = b' ';
+                        consume_line_comments(&mut it)
+                    }
+                }
             }
         }
     }
     Ok(())
+}
+
+#[inline]
+fn consume_line_comments(it: &mut IterMut<u8>) -> State {
+    let mut ret = InLineComment;
+    for c in it.by_ref() {
+        if *c == b'\n' {
+            ret = Top;
+            break;
+        } else {
+            *c = b' ';
+        }
+    }
+    ret
+}
+
+#[inline]
+fn consume_block_comments(it: &mut IterMut<u8>) -> State {
+    let mut ret = InBlockComment;
+    for c in it.by_ref() {
+        if *c == b'*' {
+            *c = b' ';
+            ret = MaybeCommentEnd;
+            break;
+        } else {
+            *c = b' ';
+        }
+    }
+    ret
 }
 
 /// Strips comments from a string in place, replacing it with whitespaces.
@@ -314,6 +350,7 @@ impl CommentSettings {
     }
 }
 
+#[inline]
 fn top(c: &mut u8, settings: CommentSettings) -> State {
     match *c {
         b'"' => InString,
@@ -364,15 +401,6 @@ fn maybe_comment_end(c: &mut u8) -> State {
         b'/' => Top,
         b'*' => MaybeCommentEnd,
         _ => InBlockComment,
-    }
-}
-
-fn in_line_comment(c: &mut u8) -> State {
-    if *c == b'\n' {
-        Top
-    } else {
-        *c = b' ';
-        InLineComment
     }
 }
 
