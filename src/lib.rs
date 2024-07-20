@@ -119,7 +119,6 @@ where
         if count > 0 {
             strip_buf(&mut self.state, &mut buf[..count], self.settings, false)?;
         } else if self.state != Top && self.state != InLineComment {
-            println!("testjfeiawwjifoewajo");
             invalid_data!();
         }
         Ok(count)
@@ -128,13 +127,13 @@ where
 
 fn consume_comment_whitespace_until_maybe_bracket(
     state: &mut State,
-    it: &mut [u8],
+    buf: &mut [u8],
     i: &mut usize,
     settings: CommentSettings,
 ) -> Result<bool> {
     *i += 1;
-    while *i < it.len() {
-        let c = &mut it[*i];
+    while *i < buf.len() {
+        let c = &mut buf[*i];
         *state = match state {
             Top => {
                 *state = top(c, settings);
@@ -147,9 +146,9 @@ fn consume_comment_whitespace_until_maybe_bracket(
             InString => in_string(*c),
             StringEscape => InString,
             InComment => in_comment(c, settings)?,
-            InBlockComment => consume_block_comments(it, i),
+            InBlockComment => consume_block_comments(buf, i),
             MaybeCommentEnd => maybe_comment_end(c),
-            InLineComment => consume_line_comments(it, i),
+            InLineComment => consume_line_comments(buf, i),
         };
         *i += 1;
     }
@@ -186,41 +185,40 @@ fn strip_buf(
                 InLineComment => consume_line_comments(buf, &mut i),
             }
         }
-        // dbg!(&i);
         i += 1;
     }
     Ok(())
 }
 
 #[inline]
-fn consume_line_comments(it: &mut [u8], i: &mut usize) -> State {
+fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
     let cur = *i;
-    match memchr::memchr(b'\n', &it[*i..]) {
-        Some(index) => {
-            *i = (*i + index);
-            it[cur..*i].fill(b' ');
+    match memchr::memchr(b'\n', &buf[*i..]) {
+        Some(offset) => {
+            *i = *i + offset;
+            buf[cur..*i].fill(b' ');
             Top
         }
         None => {
-            *i = it.len() - 1;
-            it[cur..].fill(b' ');
+            *i = buf.len() - 1;
+            buf[cur..].fill(b' ');
             InLineComment
         }
     }
 }
 
 #[inline]
-fn consume_block_comments(it: &mut [u8], i: &mut usize) -> State {
+fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
     let cur = *i;
-    match memchr::memchr(b'*', &it[*i..]) {
-        Some(index) => {
-            *i = (*i + index);
-            it[cur..=*i].fill(b' ');
+    match memchr::memchr(b'*', &buf[*i..]) {
+        Some(offset) => {
+            *i = *i + offset;
+            buf[cur..=*i].fill(b' ');
             MaybeCommentEnd
         }
         None => {
-            *i = it.len() - 1;
-            it[cur..].fill(b' ');
+            *i = buf.len() - 1;
+            buf[cur..].fill(b' ');
             InBlockComment
         }
     }
@@ -365,7 +363,6 @@ fn top(c: &mut u8, settings: CommentSettings) -> State {
         b'"' => InString,
         b'/' => {
             *c = b' ';
-            // println!("In comment");
             InComment
         }
         b'#' if settings.hash_line_comments => {
