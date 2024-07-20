@@ -25,10 +25,7 @@
 #![doc = include_str!("../examples/example.rs")]
 //! ```
 
-use std::{
-    io::{ErrorKind, Read, Result},
-    slice::IterMut,
-};
+use std::io::{ErrorKind, Read, Result};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 enum State {
@@ -195,7 +192,7 @@ fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
     let cur = *i;
     match memchr::memchr(b'\n', &buf[*i..]) {
         Some(offset) => {
-            *i = *i + offset;
+            *i += offset;
             buf[cur..*i].fill(b' ');
             Top
         }
@@ -212,7 +209,7 @@ fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
     let cur = *i;
     match memchr::memchr(b'*', &buf[*i..]) {
         Some(offset) => {
-            *i = *i + offset;
+            *i += offset;
             buf[cur..=*i].fill(b' ');
             MaybeCommentEnd
         }
@@ -392,16 +389,6 @@ fn in_comment(c: &mut u8, settings: CommentSettings) -> Result<State> {
     };
     *c = b' ';
     Ok(new_state)
-}
-
-fn in_block_comment(c: &mut u8) -> State {
-    let old = *c;
-    *c = b' ';
-    if old == b'*' {
-        MaybeCommentEnd
-    } else {
-        InBlockComment
-    }
 }
 
 fn maybe_comment_end(c: &mut u8) -> State {
