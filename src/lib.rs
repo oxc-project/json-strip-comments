@@ -25,10 +25,7 @@
 #![doc = include_str!("../examples/example.rs")]
 //! ```
 
-use std::{
-    io::{ErrorKind, Read, Result},
-    slice::IterMut,
-};
+use std::io::{ErrorKind, Read, Result};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 enum State {
@@ -127,14 +124,18 @@ where
 
 fn consume_comment_whitespace_until_maybe_bracket(
     state: &mut State,
-    it: &mut IterMut<u8>,
+    buf: &mut [u8],
+    i: &mut usize,
     settings: CommentSettings,
 ) -> Result<bool> {
-    while let Some(c) = it.next() {
+    *i += 1;
+    while *i < buf.len() {
+        let c = &mut buf[*i];
         *state = match state {
             Top => {
                 *state = top(c, settings);
                 if c.is_ascii_whitespace() {
+                    *i += 1;
                     continue;
                 }
                 return Ok(*c == b'}' || *c == b']');
@@ -142,10 +143,11 @@ fn consume_comment_whitespace_until_maybe_bracket(
             InString => in_string(*c),
             StringEscape => InString,
             InComment => in_comment(c, settings)?,
-            InBlockComment => consume_block_comments(it),
+            InBlockComment => consume_block_comments(buf, i),
             MaybeCommentEnd => maybe_comment_end(c),
-            InLineComment => consume_line_comments(it),
+            InLineComment => consume_line_comments(buf, i),
         };
+        *i += 1;
     }
     Ok(false)
 }
@@ -156,15 +158,18 @@ fn strip_buf(
     settings: CommentSettings,
     remove_trailing_commas: bool,
 ) -> Result<()> {
-    let mut it = buf.iter_mut();
-    while let Some(c) = it.next() {
+    let mut i = 0;
+    let len = buf.len();
+    while i < len {
+        let c = &mut buf[i];
         if matches!(state, Top) {
+            let cur = i;
             *state = top(c, settings);
             if remove_trailing_commas
                 && *c == b','
-                && consume_comment_whitespace_until_maybe_bracket(state, &mut it, settings)?
+                && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
             {
-                *c = b' ';
+                buf[cur] = b' ';
             }
         } else {
             *state = match state {
@@ -172,49 +177,48 @@ fn strip_buf(
                 InString => in_string(*c),
                 StringEscape => InString,
                 InComment => in_comment(c, settings)?,
-                InBlockComment => in_block_comment(c),
+                InBlockComment => consume_block_comments(buf, &mut i),
                 MaybeCommentEnd => maybe_comment_end(c),
-                InLineComment => {
-                    if *c == b'\n' {
-                        Top
-                    } else {
-                        *c = b' ';
-                        consume_line_comments(&mut it)
-                    }
-                }
+                InLineComment => consume_line_comments(buf, &mut i),
             }
         }
+        i += 1;
     }
     Ok(())
 }
 
 #[inline]
-fn consume_line_comments(it: &mut IterMut<u8>) -> State {
-    let mut ret = InLineComment;
-    for c in it.by_ref() {
-        if *c == b'\n' {
-            ret = Top;
-            break;
-        } else {
-            *c = b' ';
+fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
+    let cur = *i;
+    match memchr::memchr(b'\n', &buf[*i..]) {
+        Some(offset) => {
+            *i += offset;
+            buf[cur..*i].fill(b' ');
+            Top
+        }
+        None => {
+            *i = buf.len() - 1;
+            buf[cur..].fill(b' ');
+            InLineComment
         }
     }
-    ret
 }
 
 #[inline]
-fn consume_block_comments(it: &mut IterMut<u8>) -> State {
-    let mut ret = InBlockComment;
-    for c in it.by_ref() {
-        if *c == b'*' {
-            *c = b' ';
-            ret = MaybeCommentEnd;
-            break;
-        } else {
-            *c = b' ';
+fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
+    let cur = *i;
+    match memchr::memchr(b'*', &buf[*i..]) {
+        Some(offset) => {
+            *i += offset;
+            buf[cur..=*i].fill(b' ');
+            MaybeCommentEnd
+        }
+        None => {
+            *i = buf.len() - 1;
+            buf[cur..].fill(b' ');
+            InBlockComment
         }
     }
-    ret
 }
 
 /// Strips comments from a string in place, replacing it with whitespaces.
@@ -366,6 +370,7 @@ fn top(c: &mut u8, settings: CommentSettings) -> State {
     }
 }
 
+#[inline]
 fn in_string(c: u8) -> State {
     match c {
         b'"' => Top,
@@ -378,20 +383,12 @@ fn in_comment(c: &mut u8, settings: CommentSettings) -> Result<State> {
     let new_state = match c {
         b'*' if settings.block_comments => InBlockComment,
         b'/' if settings.slash_line_comments => InLineComment,
-        _ => invalid_data!(),
+        _ => {
+            invalid_data!()
+        }
     };
     *c = b' ';
     Ok(new_state)
-}
-
-fn in_block_comment(c: &mut u8) -> State {
-    let old = *c;
-    *c = b' ';
-    if old == b'*' {
-        MaybeCommentEnd
-    } else {
-        InBlockComment
-    }
 }
 
 fn maybe_comment_end(c: &mut u8) -> State {
