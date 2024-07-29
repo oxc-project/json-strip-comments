@@ -38,6 +38,7 @@ enum State {
     InLineComment,
 }
 
+use jetscii::{ascii_chars, bytes};
 use State::{
     InBlockComment, InComment, InLineComment, InString, MaybeCommentEnd, StringEscape, Top,
 };
@@ -130,21 +131,28 @@ fn consume_comment_whitespace_until_maybe_bracket(
 ) -> Result<bool> {
     *i += 1;
     while *i < buf.len() {
-        let c = &mut buf[*i];
         *state = match state {
             Top => {
-                *state = top(c, settings);
-                if c.is_ascii_whitespace() {
-                    *i += 1;
-                    continue;
+                match bytes!(b'"', b'/', b'#', b'}', b']').find(&buf[*i..]) {
+                    Some(index) => {
+                        *i += index;
+                    }
+                    None => {
+                        *i = buf.len();
+                        return Ok(false);
+                    }
+                };
+                let c = &mut buf[*i];
+                if *c == b'}' || *c == b']' {
+                    return Ok(true);
                 }
-                return Ok(*c == b'}' || *c == b']');
+                top(c, settings)
             }
-            InString => in_string(*c),
+            InString => in_string(buf[*i]),
             StringEscape => InString,
-            InComment => in_comment(c, settings)?,
+            InComment => in_comment(&mut buf[*i], settings)?,
             InBlockComment => consume_block_comments(buf, i),
-            MaybeCommentEnd => maybe_comment_end(c),
+            MaybeCommentEnd => maybe_comment_end(&mut buf[*i]),
             InLineComment => consume_line_comments(buf, i),
         };
         *i += 1;
