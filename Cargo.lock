@@ -82,9 +82,9 @@ dependencies = [
 
 [[package]]
 name = "criterion2"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8df39381f28ced0ceebfb5611528d99aef14f8d75b43e9d4ceb6aba66e7b04d"
+checksum = "e28d8111cea0da58d7bf5c6192202ff6b44bf6d712e45a376755708db425029f"
 dependencies = [
  "anes",
  "bpaf",
@@ -218,9 +218,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.127"
+version = "1.0.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
+checksum = "6ff5456707a1de34e7e37f2a6fd3d3f808c318259cbd01ab6377795054b483d8"
 dependencies = [
  "itoa",
  "memchr",
