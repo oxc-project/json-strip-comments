@@ -37,13 +37,12 @@ pub struct CommentSettings {
 pub fn strip(string: String, settings: Option<CommentSettings>) -> String {
     let mut string = string;
     let settings = settings.unwrap_or_default();
-    let remove_trailing_commas = settings.trailing_commas.unwrap_or(true);
     let settings = json_strip_comments::CommentSettings {
         block_comments: settings.block_comments.unwrap_or(true),
         slash_line_comments: settings.slash_line_comments.unwrap_or(true),
         hash_line_comments: settings.hash_line_comments.unwrap_or(true),
+        trailing_commas: settings.trailing_commas.unwrap_or(true),
     };
-    let _ =
-        json_strip_comments::strip_comments_in_place(&mut string, settings, remove_trailing_commas);
+    let _ = json_strip_comments::strip_comments_in_place(&mut string, settings);
     string
 }

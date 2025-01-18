@@ -108,7 +108,7 @@ where
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let count = self.inner.read(buf)?;
         if count > 0 {
-            strip_buf(&mut self.state, &mut buf[..count], self.settings, false)?;
+            strip_buf(&mut self.state, &mut buf[..count], self.settings)?;
         } else if self.state != Top && self.state != InLineComment {
             return Err(ErrorKind::InvalidData.into());
         }
@@ -146,12 +146,7 @@ fn consume_comment_whitespace_until_maybe_bracket(
     Ok(false)
 }
 
-fn strip_buf(
-    state: &mut State,
-    buf: &mut [u8],
-    settings: CommentSettings,
-    remove_trailing_commas: bool,
-) -> Result<()> {
+fn strip_buf(state: &mut State, buf: &mut [u8], settings: CommentSettings) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
     while i < len {
@@ -159,7 +154,7 @@ fn strip_buf(
         if matches!(state, Top) {
             let cur = i;
             *state = top(c, settings);
-            if remove_trailing_commas
+            if settings.trailing_commas
                 && *c == b','
                 && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
             {
@@ -234,22 +229,13 @@ fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
 ///                     \n}           ");
 ///
 /// ```
-pub fn strip_comments_in_place(
-    s: &mut str,
-    settings: CommentSettings,
-    remove_trailing_commas: bool,
-) -> Result<()> {
+pub fn strip_comments_in_place(s: &mut str, settings: CommentSettings) -> Result<()> {
     // Safety: we have made sure the text is UTF-8
-    strip_buf(
-        &mut Top,
-        unsafe { s.as_bytes_mut() },
-        settings,
-        remove_trailing_commas,
-    )
+    strip_buf(&mut Top, unsafe { s.as_bytes_mut() }, settings)
 }
 
 pub fn strip(s: &mut str) -> Result<()> {
-    strip_comments_in_place(s, CommentSettings::all(), true)
+    strip_comments_in_place(s, CommentSettings::all())
 }
 
 /// Settings for `StripComments`
@@ -257,12 +243,14 @@ pub fn strip(s: &mut str) -> Result<()> {
 /// The default is for all comment types to be enabled.
 #[derive(Copy, Clone, Debug)]
 pub struct CommentSettings {
-    /// True if c-style block comments (`/* ... */`) are allowed
+    /// True if c-style block comments (`/* ... */`) are removed.
     pub block_comments: bool,
-    /// True if c-style `//` line comments are allowed
+    /// True if c-style `//` line comments are removed.
     pub slash_line_comments: bool,
-    /// True if shell-style `#` line comments are allowed
+    /// True if shell-style `#` line comments are removed.
     pub hash_line_comments: bool,
+    /// True of trailing commas are removed.
+    pub trailing_commas: bool,
 }
 
 impl Default for CommentSettings {
@@ -278,6 +266,7 @@ impl CommentSettings {
             block_comments: true,
             slash_line_comments: true,
             hash_line_comments: true,
+            trailing_commas: true,
         }
     }
     /// Only allow line comments starting with `#`
@@ -286,6 +275,7 @@ impl CommentSettings {
             hash_line_comments: true,
             block_comments: false,
             slash_line_comments: false,
+            trailing_commas: false,
         }
     }
     /// Only allow "c-style" comments.
@@ -297,6 +287,7 @@ impl CommentSettings {
             block_comments: true,
             slash_line_comments: true,
             hash_line_comments: false,
+            trailing_commas: true,
         }
     }
 
@@ -519,7 +510,7 @@ mod tests {
     #[test]
     fn strip_in_place() {
         let mut json = String::from(r#"{/* Comment */"hi": /** abc */ "bye"}"#);
-        strip_comments_in_place(&mut json, CommentSettings::default(), false).unwrap();
+        strip_comments_in_place(&mut json, CommentSettings::default()).unwrap();
         assert_eq!(json, r#"{             "hi":            "bye"}"#);
     }
 
@@ -540,7 +531,7 @@ mod tests {
             # another
         }"#,
         );
-        strip_comments_in_place(&mut json, CommentSettings::default(), true).unwrap();
+        strip_comments_in_place(&mut json, CommentSettings::default()).unwrap();
 
         let expected = r#"{
             "a1": [1 ],
