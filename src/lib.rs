@@ -124,14 +124,14 @@ where
 ///
 /// let mut string = String::from(r#"{
 /// // c line comment
-/// "a": "comment in string /* a */",
+/// "a": "comment in string /* a */"
 /// ## shell line comment
 /// } /** end */"#);
 ///
-/// strip_comments_in_place(&mut string, CommentSettings::default(), false).unwrap();
+/// strip_comments_in_place(&mut string, CommentSettings::default()).unwrap();
 ///
 /// assert_eq!(string, "{
-///                  \n\"a\": \"comment in string /* a */\",
+///                  \n\"a\": \"comment in string /* a */\"
 ///                     \n}           ");
 ///
 /// ```
