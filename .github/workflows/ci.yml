@@ -22,10 +22,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: taiki-e/checkout-action@v1
-      - uses: Boshen/setup-rust@main
+      - uses: oxc-project/setup-rust@v1.0.0
         with:
           save-cache: ${{ github.ref_name == 'main' }}
           components: clippy
       - run: cargo check
       - run: cargo clippy
       - run: RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --document-private-items
+
+  test-wasm32-unknown-unknown:
+    name: Check wasm32-unknown-unknown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: taiki-e/checkout-action@v1
+
+      - uses: oxc-project/setup-rust@v1.0.0
+        with:
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: wasm
+          tools: wasm-pack
+
+      - name: Check
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo check -p json-strip-comments-wasm --target wasm32-unknown-unknown
+
+      - uses: pnpm/action-setup@v4.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+
+      - working-directory: wasm
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm run test
