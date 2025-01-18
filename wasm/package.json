@@ -21,5 +21,6 @@
     "json_strip_comments_wasm.js",
     "json_strip_comments_wasm_bg.wasm",
     "json_strip_comments_wasm_bg.wasm.d.ts"
-  ]
+  ],
+  "packageManager": "pnpm@10.0.0"
 }
