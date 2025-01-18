@@ -101,12 +101,6 @@ where
     }
 }
 
-macro_rules! invalid_data {
-    () => {
-        return Err(ErrorKind::InvalidData.into())
-    };
-}
-
 impl<T> Read for StripComments<T>
 where
     T: Read,
@@ -116,7 +110,7 @@ where
         if count > 0 {
             strip_buf(&mut self.state, &mut buf[..count], self.settings, false)?;
         } else if self.state != Top && self.state != InLineComment {
-            invalid_data!();
+            return Err(ErrorKind::InvalidData.into());
         }
         Ok(count)
     }
@@ -383,9 +377,7 @@ fn in_comment(c: &mut u8, settings: CommentSettings) -> Result<State> {
     let new_state = match c {
         b'*' if settings.block_comments => InBlockComment,
         b'/' if settings.slash_line_comments => InLineComment,
-        _ => {
-            invalid_data!()
-        }
+        _ => return Err(ErrorKind::InvalidData.into()),
     };
     *c = b' ';
     Ok(new_state)
