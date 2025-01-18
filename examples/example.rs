@@ -5,7 +5,7 @@ fn main() {
         r#"
      {
          "name": /* full */ "John Doe",
-         "age": 43,
+         "age": 43, # hash comment
          "phones": [
              "+44 1234567", // work phone
              "+44 2345678", // home phone

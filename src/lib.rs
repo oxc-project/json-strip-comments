@@ -344,7 +344,9 @@ fn top(c: &mut u8, settings: CommentSettings) -> State {
     match *c {
         b'"' => InString,
         b'/' => {
-            *c = b' ';
+            if settings.block_comments || settings.slash_line_comments {
+                *c = b' ';
+            }
             InComment
         }
         b'#' if settings.hash_line_comments => {
@@ -505,6 +507,32 @@ mod tests {
             .read_to_string(&mut stripped)
             .unwrap_err();
         assert_eq!(err.kind(), ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn keep_all() {
+        let original = String::from(
+            r#"
+     {
+         "name": /* full */ "John Doe",
+         "age": 43, # hash line comment
+         "phones": [
+             "+44 1234567", // work phone
+             "+44 2345678", // home phone
+         ], /** comment **/
+     }"#,
+        );
+        let mut changed = original.clone();
+        let _ = strip_comments_in_place(
+            &mut changed,
+            CommentSettings {
+                block_comments: false,
+                slash_line_comments: false,
+                hash_line_comments: false,
+                trailing_commas: false,
+            },
+        );
+        assert_eq!(original, changed);
     }
 
     #[test]
