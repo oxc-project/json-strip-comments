@@ -264,11 +264,11 @@ pub fn strip(s: &mut str) -> Result<()> {
 #[derive(Copy, Clone, Debug)]
 pub struct CommentSettings {
     /// True if c-style block comments (`/* ... */`) are allowed
-    block_comments: bool,
+    pub block_comments: bool,
     /// True if c-style `//` line comments are allowed
-    slash_line_comments: bool,
+    pub slash_line_comments: bool,
     /// True if shell-style `#` line comments are allowed
-    hash_line_comments: bool,
+    pub hash_line_comments: bool,
 }
 
 impl Default for CommentSettings {

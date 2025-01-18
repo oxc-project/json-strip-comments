@@ -1,0 +1,25 @@
+{
+  "name": "json-strip-comments",
+  "version": "1.0.4",
+  "license": "MIT",
+  "description": "Wasm for JSON Strip Comments (jsonc)",
+  "keywords": ["jsonc", "json", "strip", "comments"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oxc-project/json-strip-comments"
+  },
+  "main": "./json_strip_comments_wasm.js",
+  "types": "./json_strip_comments_wasm.d.ts",
+  "scripts": {
+    "build": "pnpm build-node && pnpm run copy-files",
+    "build-node": "wasm-pack build --release --target nodejs --out-dir ../npm",
+    "copy-files": "cp ./package.json ../npm/package.json && cp ./README.md ../npm/README.md",
+    "test": "node ./test/test.mjs"
+  },
+  "files": [
+    "json_strip_comments_wasm.d.ts",
+    "json_strip_comments_wasm.js",
+    "json_strip_comments_wasm_bg.wasm",
+    "json_strip_comments_wasm_bg.wasm.d.ts"
+  ]
+}

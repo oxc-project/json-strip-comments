@@ -1,9 +1,17 @@
+[workspace]
+resolver = "2"
+members = [".", "wasm"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+
 [package]
 name = "json-strip-comments"
+edition.workspace = true
+license.workspace = true
 version = "1.0.4"
-edition = "2021"
 description = "Strip comments from JSON"
-license = "MIT"
 readme = "README.md"
 repository = "https://github.com/oxc-project/json-strip-comments"
 
