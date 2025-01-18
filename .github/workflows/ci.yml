@@ -54,6 +54,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           cache: pnpm
+          cache-dependency-path: ./wasm/pnpm-lock.yaml
 
       - working-directory: wasm
         run: |
