@@ -47,7 +47,7 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo check -p json-strip-comments-wasm --target wasm32-unknown-unknown
 
-      - uses: pnpm/action-setup@v4.0.0
+      - uses: pnpm/action-setup@v4.1.0
         with:
           package_json_file: ./wasm/package.json
 
