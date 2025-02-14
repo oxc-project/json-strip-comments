@@ -21,8 +21,8 @@ jobs:
     name: CI
     runs-on: ubuntu-latest
     steps:
-      - uses: taiki-e/checkout-action@v1
-      - uses: oxc-project/setup-rust@v1.0.0
+      - uses: taiki-e/checkout-action@b13d20b7cda4e2f325ef19895128f7ff735c0b3d # v1.3.1
+      - uses: oxc-project/setup-rust@cd82e1efec7fef815e2c23d296756f31c7cdc03d # v1.0.0
         with:
           save-cache: ${{ github.ref_name == 'main' }}
           components: clippy
@@ -34,9 +34,9 @@ jobs:
     name: Check wasm32-unknown-unknown
     runs-on: ubuntu-latest
     steps:
-      - uses: taiki-e/checkout-action@v1
+      - uses: taiki-e/checkout-action@b13d20b7cda4e2f325ef19895128f7ff735c0b3d # v1.3.1
 
-      - uses: oxc-project/setup-rust@v1.0.0
+      - uses: oxc-project/setup-rust@cd82e1efec7fef815e2c23d296756f31c7cdc03d # v1.0.0
         with:
           save-cache: ${{ github.ref_name == 'main' }}
           cache-key: wasm
@@ -47,11 +47,11 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo check -p json-strip-comments-wasm --target wasm32-unknown-unknown
 
-      - uses: pnpm/action-setup@v4.1.0
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
         with:
           package_json_file: ./wasm/package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           cache: pnpm
           cache-dependency-path: ./wasm/pnpm-lock.yaml
