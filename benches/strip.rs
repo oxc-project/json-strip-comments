@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 pub fn bench(c: &mut Criterion) {
     c.bench_function("tsconfig", |b| {
