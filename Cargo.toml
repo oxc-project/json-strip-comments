@@ -5,6 +5,7 @@ members = [".", "wasm"]
 [workspace.package]
 edition = "2024"
 license = "MIT"
+rust-version = "1.85.0"
 
 [package]
 name = "json-strip-comments"
@@ -14,6 +15,7 @@ version = "1.0.4"
 description = "Strip comments from JSON"
 readme = "README.md"
 repository = "https://github.com/oxc-project/json-strip-comments"
+rust-version.workspace = true
 
 [[bench]]
 name    = "strip"
