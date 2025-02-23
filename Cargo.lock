@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "json-strip-comments"
-version = "1.0.4"
+version = "2.0.0"
 dependencies = [
  "criterion2",
  "memchr",
