@@ -31,7 +31,6 @@ use std::io::{ErrorKind, Read, Result};
 enum State {
     Top,
     InString,
-    StringEscape,
     InComment,
     InBlockComment,
     MaybeCommentEnd,
@@ -39,7 +38,7 @@ enum State {
 }
 
 use State::{
-    InBlockComment, InComment, InLineComment, InString, MaybeCommentEnd, StringEscape, Top,
+    InBlockComment, InComment, InLineComment, InString, MaybeCommentEnd, Top,
 };
 
 /// A [`Read`] that transforms another [`Read`] so that it changes all comments to spaces so that a downstream json parser
@@ -136,12 +135,76 @@ where
 ///
 /// ```
 pub fn strip_comments_in_place(s: &mut str, settings: CommentSettings) -> Result<()> {
+    // Fast path: if there are no potential comment characters, return early
     // Safety: we have made sure the text is UTF-8
-    strip_buf(&mut Top, unsafe { s.as_bytes_mut() }, settings)
+    let bytes = unsafe { s.as_bytes_mut() };
+    
+    if !has_potential_comments(bytes, settings) && !settings.trailing_commas {
+        return Ok(());
+    }
+    
+    // If we only need to handle trailing commas but no comments, do a lighter check
+    if !has_potential_comments(bytes, settings) && settings.trailing_commas {
+        return strip_trailing_commas_only(bytes);
+    }
+
+    strip_buf(&mut Top, bytes, settings)
 }
 
 pub fn strip(s: &mut str) -> Result<()> {
     strip_comments_in_place(s, CommentSettings::all())
+}
+
+/// Fast check if the input contains any comment-starting characters
+#[inline]
+fn has_potential_comments(s: &[u8], settings: CommentSettings) -> bool {
+    // Use the most efficient memchr variant based on enabled comment types
+    match (
+        settings.block_comments || settings.slash_line_comments,
+        settings.hash_line_comments,
+    ) {
+        (true, true) => memchr::memchr2(b'/', b'#', s).is_some(),
+        (true, false) => memchr::memchr(b'/', s).is_some(),
+        (false, true) => memchr::memchr(b'#', s).is_some(),
+        (false, false) => false,
+    }
+}
+
+/// Handle only trailing commas without going through the full state machine
+fn strip_trailing_commas_only(buf: &mut [u8]) -> Result<()> {
+    let mut i = 0;
+    let len = buf.len();
+    
+    while i < len {
+        match buf[i] {
+            b'"' => {
+                // Skip over strings to avoid false positives
+                i += 1;
+                while i < len {
+                    match buf[i] {
+                        b'"' => break,
+                        b'\\' => i += 1, // Skip escaped character
+                        _ => {}
+                    }
+                    i += 1;
+                }
+            }
+            b',' => {
+                let mut j = i + 1;
+                // Skip whitespace after comma
+                while j < len && buf[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                // If we hit a closing bracket/brace, replace comma with space
+                if j < len && (buf[j] == b'}' || buf[j] == b']') {
+                    buf[i] = b' ';
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Ok(())
 }
 
 /// Settings for `StripComments`
@@ -263,8 +326,7 @@ fn consume_comment_whitespace_until_maybe_bracket(
                 }
                 return Ok(*c == b'}' || *c == b']');
             }
-            InString => in_string(*c),
-            StringEscape => InString,
+            InString => skip_string_content(buf, i),
             InComment => in_comment(c, settings)?,
             InBlockComment => consume_block_comments(buf, i),
             MaybeCommentEnd => maybe_comment_end(c),
@@ -275,12 +337,13 @@ fn consume_comment_whitespace_until_maybe_bracket(
     Ok(false)
 }
 
+
 fn strip_buf(state: &mut State, buf: &mut [u8], settings: CommentSettings) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
     while i < len {
-        let c = &mut buf[i];
         if matches!(state, Top) {
+            let c = &mut buf[i];
             let cur = i;
             *state = top(c, settings);
             if settings.trailing_commas
@@ -290,10 +353,13 @@ fn strip_buf(state: &mut State, buf: &mut [u8], settings: CommentSettings) -> Re
                 buf[cur] = b' ';
             }
         } else {
+            let c = &mut buf[i];
             *state = match state {
                 Top => unreachable!(),
-                InString => in_string(*c),
-                StringEscape => InString,
+                InString => {
+                    // Use optimized string skipping for long strings
+                    skip_string_content(buf, &mut i)
+                }
                 InComment => in_comment(c, settings)?,
                 InBlockComment => consume_block_comments(buf, &mut i),
                 MaybeCommentEnd => maybe_comment_end(c),
@@ -357,12 +423,34 @@ fn top(c: &mut u8, settings: CommentSettings) -> State {
     }
 }
 
+
+/// Optimized string content skipping using memchr
 #[inline]
-fn in_string(c: u8) -> State {
-    match c {
-        b'"' => Top,
-        b'\\' => StringEscape,
-        _ => InString,
+fn skip_string_content(buf: &[u8], i: &mut usize) -> State {
+    // Find the next quote or backslash
+    match memchr::memchr2(b'"', b'\\', &buf[*i..]) {
+        Some(offset) => {
+            *i += offset;
+            match buf[*i] {
+                b'"' => {
+                    // Found closing quote
+                    Top
+                }
+                b'\\' => {
+                    // Found escape, skip next character if it exists
+                    if *i + 1 < buf.len() {
+                        *i += 1;
+                    }
+                    InString
+                }
+                _ => unreachable!(),
+            }
+        }
+        None => {
+            // No more quotes or escapes in this buffer
+            *i = buf.len() - 1;
+            InString
+        }
     }
 }
 
