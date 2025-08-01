@@ -13,5 +13,5 @@ doctest = false
 json-strip-comments = { path = ".." }
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
-tsify = "0.5.0"
-wasm-bindgen = "0.2.99"
+tsify = "0.5.5"
+wasm-bindgen = "0.2.100"
