@@ -1,16 +1,77 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
 pub fn bench(c: &mut Criterion) {
     c.bench_function("tsconfig", |b| {
-        b.iter(|| {
-            let mut data = String::from(TSCONFIG);
-            json_strip_comments::strip(&mut data).unwrap();
-        });
+        b.iter_batched(
+            || String::from(TSCONFIG),
+            |mut data| json_strip_comments::strip(&mut data).unwrap(),
+            BatchSize::SmallInput,
+        );
+    });
+
+    // Benchmark with no comments (fast path test)
+    c.bench_function("no_comments", |b| {
+        b.iter_batched(
+            || String::from(NO_COMMENTS_JSON),
+            |mut data| json_strip_comments::strip(&mut data).unwrap(),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    // Benchmark with minimal comments
+    c.bench_function("minimal_comments", |b| {
+        b.iter_batched(
+            || String::from(MINIMAL_COMMENTS),
+            |mut data| json_strip_comments::strip(&mut data).unwrap(),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    // Benchmark with large input with many comments
+    c.bench_function("large_with_comments", |b| {
+        b.iter_batched(
+            || MINIMAL_COMMENTS.repeat(100),
+            |mut data| json_strip_comments::strip(&mut data).unwrap(),
+            criterion::BatchSize::SmallInput,
+        );
     });
 }
 
 criterion_group!(strip, bench);
 criterion_main!(strip);
+
+const NO_COMMENTS_JSON: &str = r#"
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "sourceMap": true,
+    "outDir": "./built",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "exclude": [
+    "node_modules",
+    ".npm"
+  ],
+  "include": ["./src"]
+}
+"#;
+
+const MINIMAL_COMMENTS: &str = r#"
+{
+  // Simple line comment
+  "name": "test", /* block comment */
+  "value": 42,
+  # hash comment
+  "trailing": true,
+}
+"#;
 
 const TSCONFIG: &str = r#"
 {
