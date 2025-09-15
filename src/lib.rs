@@ -278,29 +278,60 @@ fn consume_comment_whitespace_until_maybe_bracket(
 fn strip_buf(state: &mut State, buf: &mut [u8], settings: CommentSettings) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
-    while i < len {
+    
+    // Fast path for Top state - most common case
+    while i < len && *state == Top {
         let c = &mut buf[i];
-        if matches!(state, Top) {
-            let cur = i;
-            *state = top(c, settings);
-            if settings.trailing_commas
-                && *c == b','
-                && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
-            {
-                buf[cur] = b' ';
-            }
-        } else {
-            *state = match state {
-                Top => unreachable!(),
-                InString => in_string(*c),
-                StringEscape => InString,
-                InComment => in_comment(c, settings)?,
-                InBlockComment => consume_block_comments(buf, &mut i),
-                MaybeCommentEnd => maybe_comment_end(c),
-                InLineComment => consume_line_comments(buf, &mut i),
-            }
+        let cur = i;
+        *state = top(c, settings);
+        if settings.trailing_commas
+            && *c == b','
+            && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
+        {
+            buf[cur] = b' ';
         }
         i += 1;
+    }
+    
+    // Handle other states
+    while i < len {
+        let c = &mut buf[i];
+        *state = match *state {
+            Top => {
+                let cur = i;
+                *state = top(c, settings);
+                if settings.trailing_commas
+                    && *c == b','
+                    && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
+                {
+                    buf[cur] = b' ';
+                }
+                *state
+            }
+            InString => in_string(*c),
+            StringEscape => InString,
+            InComment => in_comment(c, settings)?,
+            InBlockComment => consume_block_comments(buf, &mut i),
+            MaybeCommentEnd => maybe_comment_end(c),
+            InLineComment => consume_line_comments(buf, &mut i),
+        };
+        i += 1;
+        
+        // Return to fast path if back to Top state
+        if *state == Top {
+            while i < len && *state == Top {
+                let c = &mut buf[i];
+                let cur = i;
+                *state = top(c, settings);
+                if settings.trailing_commas
+                    && *c == b','
+                    && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
+                {
+                    buf[cur] = b' ';
+                }
+                i += 1;
+            }
+        }
     }
     Ok(())
 }
