@@ -28,6 +28,7 @@
 use std::io::{ErrorKind, Read, Result};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
+#[repr(u8)]
 enum State {
     Top,
     InString,
@@ -252,7 +253,8 @@ fn consume_comment_whitespace_until_maybe_bracket(
     settings: CommentSettings,
 ) -> Result<bool> {
     *i += 1;
-    while *i < buf.len() {
+    let len = buf.len();
+    while *i < len {
         let c = &mut buf[*i];
         *state = match state {
             Top => {
@@ -278,68 +280,79 @@ fn consume_comment_whitespace_until_maybe_bracket(
 fn strip_buf(state: &mut State, buf: &mut [u8], settings: CommentSettings) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
+    
+    // Fast path for Top state which is most common
     while i < len {
         let c = &mut buf[i];
-        if matches!(state, Top) {
-            let cur = i;
-            *state = top(c, settings);
-            if settings.trailing_commas
-                && *c == b','
-                && consume_comment_whitespace_until_maybe_bracket(state, buf, &mut i, settings)?
-            {
-                buf[cur] = b' ';
+        
+        match state {
+            Top => {
+                let cur = i;
+                let new_state = top(c, settings);
+                if settings.trailing_commas
+                    && *c == b','
+                {
+                    let mut temp_state = new_state;
+                    if consume_comment_whitespace_until_maybe_bracket(&mut temp_state, buf, &mut i, settings)? {
+                        buf[cur] = b' ';
+                    }
+                    *state = temp_state;
+                } else {
+                    *state = new_state;
+                }
             }
-        } else {
-            *state = match state {
-                Top => unreachable!(),
-                InString => in_string(*c),
-                StringEscape => InString,
-                InComment => in_comment(c, settings)?,
-                InBlockComment => consume_block_comments(buf, &mut i),
-                MaybeCommentEnd => maybe_comment_end(c),
-                InLineComment => consume_line_comments(buf, &mut i),
-            }
+            InString => *state = in_string(*c),
+            StringEscape => *state = InString,
+            InComment => *state = in_comment(c, settings)?,
+            InBlockComment => *state = consume_block_comments(buf, &mut i),
+            MaybeCommentEnd => *state = maybe_comment_end(c),
+            InLineComment => *state = consume_line_comments(buf, &mut i),
         }
+        
         i += 1;
     }
     Ok(())
 }
 
-#[inline]
+#[inline(always)]
 fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
     let cur = *i;
-    match memchr::memchr(b'\n', &buf[*i..]) {
+    let remaining = &buf[*i..];
+    match memchr::memchr(b'\n', remaining) {
         Some(offset) => {
             *i += offset;
             buf[cur..*i].fill(b' ');
             Top
         }
         None => {
-            *i = buf.len() - 1;
-            buf[cur..].fill(b' ');
+            let len = buf.len();
+            *i = len - 1;
+            buf[cur..len].fill(b' ');
             InLineComment
         }
     }
 }
 
-#[inline]
+#[inline(always)]
 fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
     let cur = *i;
-    match memchr::memchr(b'*', &buf[*i..]) {
+    let remaining = &buf[*i..];
+    match memchr::memchr(b'*', remaining) {
         Some(offset) => {
             *i += offset;
             buf[cur..=*i].fill(b' ');
             MaybeCommentEnd
         }
         None => {
-            *i = buf.len() - 1;
-            buf[cur..].fill(b' ');
+            let len = buf.len();
+            *i = len - 1;
+            buf[cur..len].fill(b' ');
             InBlockComment
         }
     }
 }
 
-#[inline]
+#[inline(always)]
 fn top(c: &mut u8, settings: CommentSettings) -> State {
     match *c {
         b'"' => InString,
@@ -357,7 +370,7 @@ fn top(c: &mut u8, settings: CommentSettings) -> State {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn in_string(c: u8) -> State {
     match c {
         b'"' => Top,
@@ -366,8 +379,9 @@ fn in_string(c: u8) -> State {
     }
 }
 
+#[inline]
 fn in_comment(c: &mut u8, settings: CommentSettings) -> Result<State> {
-    let new_state = match c {
+    let new_state = match *c {
         b'*' if settings.block_comments => InBlockComment,
         b'/' if settings.slash_line_comments => InLineComment,
         _ => return Err(ErrorKind::InvalidData.into()),
@@ -376,6 +390,7 @@ fn in_comment(c: &mut u8, settings: CommentSettings) -> Result<State> {
     Ok(new_state)
 }
 
+#[inline]
 fn maybe_comment_end(c: &mut u8) -> State {
     let old = *c;
     *c = b' ';
