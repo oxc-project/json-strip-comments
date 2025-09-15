@@ -7,4 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.0.0...json-strip-comments-v3.0.1) - 2025-09-15
+
+### Other
+
+- move tests
+- more tests
+
 ## [3.0.0](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v2.0.0...json-strip-comments-v2.0.1) - 2025-09-15
