@@ -166,30 +166,33 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
     
-    // Fast path for Top state which is most common
     while i < len {
         let c = &mut buf[i];
         
-        match state {
-            Top => {
-                let cur = i;
-                let new_state = top(c);
-                if *c == b',' {
-                    let mut temp_state = new_state;
-                    if consume_comment_whitespace_until_maybe_bracket(&mut temp_state, buf, &mut i)? {
-                        buf[cur] = b' ';
-                    }
-                    *state = temp_state;
-                } else {
-                    *state = new_state;
+        // Fast path for Top state which is most common
+        if *state == Top {
+            let cur = i;
+            let new_state = top(c);
+            if *c == b',' {
+                let mut temp_state = new_state;
+                if consume_comment_whitespace_until_maybe_bracket(&mut temp_state, buf, &mut i)? {
+                    buf[cur] = b' ';
                 }
+                *state = temp_state;
+            } else {
+                *state = new_state;
             }
-            InString => *state = in_string(*c),
-            StringEscape => *state = InString,
-            InComment => *state = in_comment(c)?,
-            InBlockComment => *state = consume_block_comments(buf, &mut i),
-            MaybeCommentEnd => *state = maybe_comment_end(c),
-            InLineComment => *state = consume_line_comments(buf, &mut i),
+        } else {
+            // Handle other states - less common
+            *state = match state {
+                InString => in_string(*c),
+                StringEscape => InString,
+                InComment => in_comment(c)?,
+                InBlockComment => consume_block_comments(buf, &mut i),
+                MaybeCommentEnd => maybe_comment_end(c),
+                InLineComment => consume_line_comments(buf, &mut i),
+                Top => unreachable!(), // Already handled above
+            };
         }
         
         i += 1;
