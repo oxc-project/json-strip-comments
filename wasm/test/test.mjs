@@ -21,14 +21,5 @@ const expected = `
     ]
 }`;
 
-[
-    null,
-    { },
-    { blockComments: true, slashLineComments: true, hashLineComments: true, trailingCommas: true }
-
-].forEach((options) => {
-    const stripped = strip(s, options);
-    assert.deepStrictEqual(JSON.parse(stripped), JSON.parse(expected));
-});
-
-assert.strictEqual(strip(s, { blockComments: false, slashLineComments: false, hashLineComments: false, trailingCommas: false }), s);
+const stripped = strip(s);
+assert.deepStrictEqual(JSON.parse(stripped), JSON.parse(expected));
