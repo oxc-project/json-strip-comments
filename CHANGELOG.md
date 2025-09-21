@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.0.1...json-strip-comments-v3.0.2) - 2025-09-21
+
+### Other
+
+- *(deps)* update github-actions ([#84](https://github.com/oxc-project/json-strip-comments/pull/84))
+- *(deps)* update dependency rust to v1.90.0 ([#83](https://github.com/oxc-project/json-strip-comments/pull/83))
+
 ## [3.0.1](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.0.0...json-strip-comments-v3.0.1) - 2025-09-15
 
 ### Other
