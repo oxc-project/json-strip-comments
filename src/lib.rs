@@ -30,13 +30,13 @@ use std::io::{ErrorKind, Read, Result};
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(u8)]
 enum State {
-    Top,
-    InString,
-    StringEscape,
-    InComment,
-    InBlockComment,
-    MaybeCommentEnd,
-    InLineComment,
+    Top = 0,
+    InString = 1,
+    StringEscape = 2,
+    InComment = 3,
+    InBlockComment = 4,
+    MaybeCommentEnd = 5,
+    InLineComment = 6,
 }
 
 use State::{
@@ -137,8 +137,9 @@ fn consume_comment_whitespace_until_maybe_bracket(
     let len = buf.len();
     while *i < len {
         let c = &mut buf[*i];
-        *state = match state {
-            Top => {
+        // Use discriminant comparison for better branch prediction
+        *state = match *state as u8 {
+            0 => { // Top
                 *state = top(c);
                 if c.is_ascii_whitespace() {
                     *i += 1;
@@ -146,12 +147,13 @@ fn consume_comment_whitespace_until_maybe_bracket(
                 }
                 return Ok(*c == b'}' || *c == b']');
             }
-            InString => in_string(*c),
-            StringEscape => InString,
-            InComment => in_comment(c)?,
-            InBlockComment => consume_block_comments(buf, i),
-            MaybeCommentEnd => maybe_comment_end(c),
-            InLineComment => consume_line_comments(buf, i),
+            1 => in_string(*c), // InString
+            2 => InString, // StringEscape
+            3 => in_comment(c)?, // InComment
+            4 => consume_block_comments(buf, i), // InBlockComment
+            5 => maybe_comment_end(c), // MaybeCommentEnd
+            6 => consume_line_comments(buf, i), // InLineComment
+            _ => unsafe { std::hint::unreachable_unchecked() }
         };
         *i += 1;
     }
@@ -166,8 +168,9 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     while i < len {
         let c = &mut buf[i];
 
-        match state {
-            Top => {
+        // Use discriminant comparison for better branch prediction
+        match *state as u8 {
+            0 => { // Top
                 let cur = i;
                 let new_state = top(c);
                 if *c == b',' {
@@ -181,12 +184,13 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
                     *state = new_state;
                 }
             }
-            InString => *state = in_string(*c),
-            StringEscape => *state = InString,
-            InComment => *state = in_comment(c)?,
-            InBlockComment => *state = consume_block_comments(buf, &mut i),
-            MaybeCommentEnd => *state = maybe_comment_end(c),
-            InLineComment => *state = consume_line_comments(buf, &mut i),
+            1 => *state = in_string(*c), // InString
+            2 => *state = InString, // StringEscape
+            3 => *state = in_comment(c)?, // InComment
+            4 => *state = consume_block_comments(buf, &mut i), // InBlockComment
+            5 => *state = maybe_comment_end(c), // MaybeCommentEnd
+            6 => *state = consume_line_comments(buf, &mut i), // InLineComment
+            _ => unsafe { std::hint::unreachable_unchecked() }
         }
 
         i += 1;
@@ -234,6 +238,11 @@ fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
 
 #[inline(always)]
 fn top(c: &mut u8) -> State {
+    // Most common case: not a special character
+    if *c != b'"' && *c != b'/' && *c != b'#' {
+        return Top;
+    }
+
     match *c {
         b'"' => InString,
         b'/' => {
@@ -250,6 +259,11 @@ fn top(c: &mut u8) -> State {
 
 #[inline(always)]
 fn in_string(c: u8) -> State {
+    // Most common case: regular character in string
+    if c != b'"' && c != b'\\' {
+        return InString;
+    }
+
     match c {
         b'"' => Top,
         b'\\' => StringEscape,
