@@ -30,13 +30,13 @@ use std::io::{ErrorKind, Read, Result};
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 #[repr(u8)]
 enum State {
-    Top,
-    InString,
-    StringEscape,
-    InComment,
-    InBlockComment,
-    MaybeCommentEnd,
-    InLineComment,
+    Top = 0,           // Most common state - make it 0 for better branch prediction
+    InString = 1,      // Second most common
+    StringEscape = 2,
+    InComment = 3,
+    InBlockComment = 4,
+    MaybeCommentEnd = 5,
+    InLineComment = 6,
 }
 
 use State::{
@@ -132,6 +132,7 @@ pub fn strip(s: &mut str) -> Result<()> {
 }
 
 
+#[inline]
 fn consume_comment_whitespace_until_maybe_bracket(
     state: &mut State,
     buf: &mut [u8],
@@ -141,7 +142,7 @@ fn consume_comment_whitespace_until_maybe_bracket(
     let len = buf.len();
     while *i < len {
         let c = &mut buf[*i];
-        *state = match state {
+        *state = match *state {
             Top => {
                 *state = top(c);
                 if c.is_ascii_whitespace() {
@@ -165,16 +166,16 @@ fn consume_comment_whitespace_until_maybe_bracket(
 fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
-    
-    // Fast path for Top state which is most common
+
     while i < len {
         let c = &mut buf[i];
-        
-        match state {
+
+        match *state {
             Top => {
+                let byte = *c;  // Cache byte before top() modifies it
                 let cur = i;
                 let new_state = top(c);
-                if *c == b',' {
+                if byte == b',' {
                     let mut temp_state = new_state;
                     if consume_comment_whitespace_until_maybe_bracket(&mut temp_state, buf, &mut i)? {
                         buf[cur] = b' ';
@@ -191,7 +192,7 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
             MaybeCommentEnd => *state = maybe_comment_end(c),
             InLineComment => *state = consume_line_comments(buf, &mut i),
         }
-        
+
         i += 1;
     }
     Ok(())
@@ -261,6 +262,7 @@ fn in_string(c: u8) -> State {
 }
 
 #[inline]
+#[cold]
 fn in_comment(c: &mut u8) -> Result<State> {
     let new_state = match *c {
         b'*' => InBlockComment,
