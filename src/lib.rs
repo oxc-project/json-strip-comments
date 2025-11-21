@@ -229,24 +229,38 @@ fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
     match memchr::memchr(b'*', remaining) {
         Some(offset) => {
             *i += offset;
-            // Preserve newlines in block comments
-            for byte in &mut buf[cur..=*i] {
-                if *byte != b'\n' && *byte != b'\r' {
-                    *byte = b' ';
-                }
-            }
+            // Preserve newlines in block comments efficiently
+            fill_non_newlines(&mut buf[cur..=*i]);
             MaybeCommentEnd
         }
         None => {
             let len = buf.len();
             *i = len - 1;
-            // Preserve newlines in block comments
-            for byte in &mut buf[cur..len] {
-                if *byte != b'\n' && *byte != b'\r' {
-                    *byte = b' ';
-                }
-            }
+            // Preserve newlines in block comments efficiently
+            fill_non_newlines(&mut buf[cur..len]);
             InBlockComment
+        }
+    }
+}
+
+/// Fill a buffer with spaces, preserving newlines for performance
+#[inline]
+fn fill_non_newlines(buf: &mut [u8]) {
+    let mut pos = 0;
+    while pos < buf.len() {
+        // Find the next newline (\n or \r)
+        match memchr::memchr2(b'\n', b'\r', &buf[pos..]) {
+            Some(offset) => {
+                // Fill everything before the newline with spaces
+                buf[pos..pos + offset].fill(b' ');
+                // Skip the newline character
+                pos += offset + 1;
+            }
+            None => {
+                // No more newlines, fill the rest
+                buf[pos..].fill(b' ');
+                break;
+            }
         }
     }
 }
