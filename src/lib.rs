@@ -119,13 +119,20 @@ where
 ///                     \n}           ");
 ///
 /// ```
+#[inline]
 pub fn strip_comments_in_place(s: &mut str) -> Result<()> {
     // Safety: we have made sure the text is UTF-8
     strip_buf(&mut Top, unsafe { s.as_bytes_mut() })
 }
 
+#[inline]
 pub fn strip(s: &mut str) -> Result<()> {
     strip_comments_in_place(s)
+}
+
+#[inline]
+pub fn strip_slice(s: &mut [u8]) -> Result<()> {
+    strip_buf(&mut Top, s)
 }
 
 fn consume_comment_whitespace_until_maybe_bracket(
