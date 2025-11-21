@@ -419,3 +419,86 @@ fn slice_api() {
     assert!(json.contains(r#""a": 1,"#));
     assert!(json.contains(r#""b": 2"#));
 }
+
+#[test]
+fn strings_with_fake_comments_and_commas() {
+    let json = r#"{
+        "code": "function test() { return 1; }, // not a comment",
+        "pattern": "match /* this is in string */, then continue",
+        "shell": "echo 'test' # fake comment, with comma",
+        "mixed": "//,/*,*/,#,"
+    }"#;
+    let stripped = strip_string(json);
+
+    // All content inside strings must be preserved exactly
+    assert!(stripped.contains("function test() { return 1; }, // not a comment"));
+    assert!(stripped.contains("match /* this is in string */, then continue"));
+    assert!(stripped.contains("echo 'test' # fake comment, with comma"));
+    assert!(stripped.contains("//,/*,*/,#,"));
+}
+
+#[test]
+fn strings_with_trailing_comma_syntax() {
+    let json = r#"{
+        "json_example": "{\"a\": 1,}",
+        "array_example": "[1, 2, 3,]",
+        "nested": "{{\"x\": [1,2,],},}",
+        "description": "These },] patterns are in strings, not real trailing commas"
+    }"#;
+    let stripped = strip_string(json);
+
+    // String content with },] should be preserved (checking the raw escaped form)
+    assert!(stripped.contains(r#"{\"a\": 1,}"#));
+    assert!(stripped.contains("[1, 2, 3,]"));
+    assert!(stripped.contains(r#"{{\"x\": [1,2,],},}"#));
+    assert!(stripped.contains("These },] patterns are in strings"));
+}
+
+#[test]
+fn escaped_quotes_with_comment_like_content() {
+    let json = r#"{
+        "escaped": "He said \"// this is not a comment\" to me",
+        "complex": "Value: \"/* nested \\\" quote */\" end",
+        "backslash": "Path\\\\Server\\Share // with comment-like text"
+    }"#;
+    let stripped = strip_string(json);
+
+    // Escaped quotes should be handled correctly, preserving comment-like strings
+    assert!(stripped.contains(r#"He said \"// this is not a comment\" to me"#));
+    assert!(stripped.contains(r#"Value: \"/* nested \\\" quote */\" end"#));
+    assert!(stripped.contains(r#"Path\\\\Server\\Share // with comment-like text"#));
+}
+
+#[test]
+fn urls_with_comments_and_commas() {
+    let json = r#"{
+        "api": "http://example.com/api?ids=1,2,3&format=json",
+        "protocol": "https://site.com//double/slash,path",
+        "query": "http://test.com?comment=/*test*/&values=a,b,c",
+        "fragment": "http://example.com/page#section,//comment-like"
+    }"#;
+    let stripped = strip_string(json);
+
+    // URLs with // and commas should be preserved
+    assert!(stripped.contains("http://example.com/api?ids=1,2,3&format=json"));
+    assert!(stripped.contains("https://site.com//double/slash,path"));
+    assert!(stripped.contains("http://test.com?comment=/*test*/&values=a,b,c"));
+    assert!(stripped.contains("http://example.com/page#section,//comment-like"));
+}
+
+#[test]
+fn regex_patterns_in_strings() {
+    let json = r#"{
+        "pattern1": "^\\d+, // match digits followed by comma and comment chars",
+        "pattern2": "[a-z]+,/* group */",
+        "pattern3": "(?://not-comment|#also-not),",
+        "sql": "SELECT * FROM table WHERE col = '//value,/*data*/' # comment"
+    }"#;
+    let stripped = strip_string(json);
+
+    // Regex patterns and SQL with comment-like syntax should be preserved
+    assert!(stripped.contains(r#"^\\d+, // match digits followed by comma and comment chars"#));
+    assert!(stripped.contains("[a-z]+,/* group */"));
+    assert!(stripped.contains("(?://not-comment|#also-not),"));
+    assert!(stripped.contains("SELECT * FROM table WHERE col = '//value,/*data*/'"));
+}
