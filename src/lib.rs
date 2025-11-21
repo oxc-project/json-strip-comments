@@ -208,7 +208,9 @@ fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
     match memchr::memchr(b'\n', remaining) {
         Some(offset) => {
             *i += offset;
-            buf[cur..*i].fill(b' ');
+            // Preserve \r if it comes right before \n (Windows line endings)
+            let end = if *i > 0 && buf[*i - 1] == b'\r' { *i - 1 } else { *i };
+            buf[cur..end].fill(b' ');
             Top
         }
         None => {
@@ -227,13 +229,23 @@ fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
     match memchr::memchr(b'*', remaining) {
         Some(offset) => {
             *i += offset;
-            buf[cur..=*i].fill(b' ');
+            // Preserve newlines in block comments
+            for byte in &mut buf[cur..=*i] {
+                if *byte != b'\n' && *byte != b'\r' {
+                    *byte = b' ';
+                }
+            }
             MaybeCommentEnd
         }
         None => {
             let len = buf.len();
             *i = len - 1;
-            buf[cur..len].fill(b' ');
+            // Preserve newlines in block comments
+            for byte in &mut buf[cur..len] {
+                if *byte != b'\n' && *byte != b'\r' {
+                    *byte = b' ';
+                }
+            }
             InBlockComment
         }
     }
@@ -278,7 +290,10 @@ fn in_comment(c: &mut u8) -> Result<State> {
 #[inline]
 fn maybe_comment_end(c: &mut u8) -> State {
     let old = *c;
-    *c = b' ';
+    // Preserve newlines in block comments
+    if old != b'\n' && old != b'\r' {
+        *c = b' ';
+    }
     match old {
         b'/' => Top,
         b'*' => MaybeCommentEnd,
