@@ -1,4 +1,4 @@
-use json_strip_comments::{StripComments, strip, strip_comments_in_place};
+use json_strip_comments::{StripComments, strip, strip_comments_in_place, strip_slice};
 
 use std::io::{ErrorKind, Read};
 
@@ -403,4 +403,19 @@ fn special_characters_in_comments() {
     let stripped = strip_string(json);
     assert!(stripped.contains(r#""key": "value""#));
     assert!(stripped.contains(r#""key2": "value2""#));
+}
+
+#[test]
+fn slice_api() {
+    let mut json = String::from(
+        r#"{
+            "a": 1, // comment after comma
+            "b": 2
+        }"#,
+    )
+    .into_bytes();
+    strip_slice(&mut json).unwrap();
+    let json = String::from_utf8(json).unwrap();
+    assert!(json.contains(r#""a": 1,"#));
+    assert!(json.contains(r#""b": 2"#));
 }
