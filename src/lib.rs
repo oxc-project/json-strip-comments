@@ -208,7 +208,9 @@ fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
     match memchr::memchr(b'\n', remaining) {
         Some(offset) => {
             *i += offset;
-            buf[cur..*i].fill(b' ');
+            // Preserve \r if it comes right before \n (Windows line endings)
+            let end = if *i > 0 && buf[*i - 1] == b'\r' { *i - 1 } else { *i };
+            buf[cur..end].fill(b' ');
             Top
         }
         None => {
@@ -227,14 +229,38 @@ fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
     match memchr::memchr(b'*', remaining) {
         Some(offset) => {
             *i += offset;
-            buf[cur..=*i].fill(b' ');
+            // Preserve newlines in block comments efficiently
+            fill_non_newlines(&mut buf[cur..=*i]);
             MaybeCommentEnd
         }
         None => {
             let len = buf.len();
             *i = len - 1;
-            buf[cur..len].fill(b' ');
+            // Preserve newlines in block comments efficiently
+            fill_non_newlines(&mut buf[cur..len]);
             InBlockComment
+        }
+    }
+}
+
+/// Fill a buffer with spaces, preserving newlines for performance
+#[inline]
+fn fill_non_newlines(buf: &mut [u8]) {
+    let mut pos = 0;
+    while pos < buf.len() {
+        // Find the next newline (\n or \r)
+        match memchr::memchr2(b'\n', b'\r', &buf[pos..]) {
+            Some(offset) => {
+                // Fill everything before the newline with spaces
+                buf[pos..pos + offset].fill(b' ');
+                // Skip the newline character
+                pos += offset + 1;
+            }
+            None => {
+                // No more newlines, fill the rest
+                buf[pos..].fill(b' ');
+                break;
+            }
         }
     }
 }
@@ -278,7 +304,10 @@ fn in_comment(c: &mut u8) -> Result<State> {
 #[inline]
 fn maybe_comment_end(c: &mut u8) -> State {
     let old = *c;
-    *c = b' ';
+    // Preserve newlines in block comments
+    if old != b'\n' && old != b'\r' {
+        *c = b' ';
+    }
     match old {
         b'/' => Top,
         b'*' => MaybeCommentEnd,
