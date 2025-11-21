@@ -428,16 +428,13 @@ fn sindresorhus_replace_comments_with_whitespace() {
     assert_eq!(strip_string("/*//comment*/{\"a\":\"b\"}"), "             {\"a\":\"b\"}");
     assert_eq!(strip_string("{\"a\":\"b\"//comment\n}"), "{\"a\":\"b\"         \n}");
     assert_eq!(strip_string("{\"a\":\"b\"/*comment*/}"), "{\"a\":\"b\"           }");
-    // Note: The Rust implementation replaces newlines in block comments with spaces,
-    // unlike the JavaScript version which preserves them
     assert_eq!(
         strip_string("{\"a\"/*\n\n\ncomment\r\n*/:\"b\"}"),
-        "{\"a\"                :\"b\"}"
+        "{\"a\"  \n\n\n       \r\n  :\"b\"}"
     );
-    // Note: Same for multi-line comments
     assert_eq!(
         strip_string("/*!\n * comment\n */\n{\"a\":\"b\"}"),
-        "                  \n{\"a\":\"b\"}"
+        "   \n          \n   \n{\"a\":\"b\"}"
     );
     assert_eq!(strip_string("{/*comment*/\"a\":\"b\"}"), "{           \"a\":\"b\"}");
 }
@@ -471,8 +468,7 @@ fn sindresorhus_line_endings_no_comments() {
 #[test]
 fn sindresorhus_line_endings_single_line_comment() {
     assert_eq!(strip_string("{\"a\":\"b\"//c\n}"), "{\"a\":\"b\"   \n}");
-    // Note: The Rust implementation treats \r\n differently - it replaces the \r as part of comment
-    assert_eq!(strip_string("{\"a\":\"b\"//c\r\n}"), "{\"a\":\"b\"    \n}");
+    assert_eq!(strip_string("{\"a\":\"b\"//c\r\n}"), "{\"a\":\"b\"   \r\n}");
 }
 
 #[test]
@@ -483,14 +479,13 @@ fn sindresorhus_line_endings_single_line_block_comment() {
 
 #[test]
 fn sindresorhus_line_endings_multi_line_block_comment() {
-    // Note: The Rust implementation replaces newlines inside block comments with spaces
     assert_eq!(
         strip_string("{\"a\":\"b\",/*c\nc2*/\"x\":\"y\"\n}"),
-        "{\"a\":\"b\",        \"x\":\"y\"\n}"
+        "{\"a\":\"b\",   \n    \"x\":\"y\"\n}"
     );
     assert_eq!(
         strip_string("{\"a\":\"b\",/*c\r\nc2*/\"x\":\"y\"\r\n}"),
-        "{\"a\":\"b\",         \"x\":\"y\"\r\n}"
+        "{\"a\":\"b\",   \r\n    \"x\":\"y\"\r\n}"
     );
 }
 
