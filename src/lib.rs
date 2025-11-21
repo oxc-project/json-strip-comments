@@ -39,9 +39,7 @@ enum State {
     InLineComment,
 }
 
-use State::{
-    InBlockComment, InComment, InLineComment, InString, MaybeCommentEnd, StringEscape, Top,
-};
+use State::{InBlockComment, InComment, InLineComment, InString, MaybeCommentEnd, StringEscape, Top};
 
 /// A [`Read`] that transforms another [`Read`] so that it changes all comments to spaces so that a downstream json parser
 /// (such as json-serde) doesn't choke on them.
@@ -135,65 +133,82 @@ pub fn strip_slice(s: &mut [u8]) -> Result<()> {
     strip_buf(&mut Top, s)
 }
 
-fn consume_comment_whitespace_until_maybe_bracket(
-    state: &mut State,
-    buf: &mut [u8],
-    i: &mut usize,
-) -> Result<bool> {
-    *i += 1;
-    let len = buf.len();
-    while *i < len {
-        let c = &mut buf[*i];
-        *state = match state {
-            Top => {
-                *state = top(c);
-                if c.is_ascii_whitespace() {
-                    *i += 1;
-                    continue;
-                }
-                return Ok(*c == b'}' || *c == b']');
-            }
-            InString => in_string(*c),
-            StringEscape => InString,
-            InComment => in_comment(c)?,
-            InBlockComment => consume_block_comments(buf, i),
-            MaybeCommentEnd => maybe_comment_end(c),
-            InLineComment => consume_line_comments(buf, i),
-        };
-        *i += 1;
-    }
-    Ok(false)
-}
-
 fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
+    let mut pending_comma_pos: Option<usize> = None;
 
-    // Fast path for Top state which is most common
     while i < len {
         let c = &mut buf[i];
 
-        match state {
+        match *state {
             Top => {
-                let cur = i;
-                let new_state = top(c);
-                if *c == b',' {
-                    let mut temp_state = new_state;
-                    if consume_comment_whitespace_until_maybe_bracket(&mut temp_state, buf, &mut i)?
-                    {
-                        buf[cur] = b' ';
+                match *c {
+                    b'"' => *state = InString,
+                    b'/' => {
+                        *c = b' ';
+                        *state = InComment;
                     }
-                    *state = temp_state;
-                } else {
-                    *state = new_state;
+                    b'#' => {
+                        *c = b' ';
+                        *state = InLineComment;
+                    }
+                    b',' => {
+                        pending_comma_pos = Some(i);
+                    }
+                    b'}' | b']' => {
+                        if let Some(pos) = pending_comma_pos {
+                            buf[pos] = b' ';
+                            pending_comma_pos = None;
+                        }
+                    }
+                    _ => {
+                        if !c.is_ascii_whitespace() {
+                            pending_comma_pos = None;
+                        }
+                    }
                 }
             }
-            InString => *state = in_string(*c),
+            InString => {
+                match *c {
+                    b'"' => *state = Top,
+                    b'\\' => *state = StringEscape,
+                    _ => {}
+                }
+            }
             StringEscape => *state = InString,
-            InComment => *state = in_comment(c)?,
-            InBlockComment => *state = consume_block_comments(buf, &mut i),
-            MaybeCommentEnd => *state = maybe_comment_end(c),
-            InLineComment => *state = consume_line_comments(buf, &mut i),
+            InComment => {
+                let old = *c;
+                *c = b' ';
+                match old {
+                    b'*' => *state = InBlockComment,
+                    b'/' => *state = InLineComment,
+                    _ => return Err(ErrorKind::InvalidData.into()),
+                }
+            }
+            InBlockComment => {
+                let old = *c;
+                *c = b' ';
+                if old == b'*' {
+                    *state = MaybeCommentEnd;
+                }
+            }
+            MaybeCommentEnd => {
+                let old = *c;
+                *c = b' ';
+                match old {
+                    b'/' => *state = Top,
+                    b'*' => *state = MaybeCommentEnd,
+                    _ => *state = InBlockComment,
+                }
+            }
+            InLineComment => {
+                if *c == b'\n' {
+                    *state = Top;
+                } else {
+                    *c = b' ';
+                }
+            }
         }
 
         i += 1;
@@ -201,87 +216,3 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     Ok(())
 }
 
-#[inline(always)]
-fn consume_line_comments(buf: &mut [u8], i: &mut usize) -> State {
-    let cur = *i;
-    let remaining = &buf[*i..];
-    match memchr::memchr(b'\n', remaining) {
-        Some(offset) => {
-            *i += offset;
-            buf[cur..*i].fill(b' ');
-            Top
-        }
-        None => {
-            let len = buf.len();
-            *i = len - 1;
-            buf[cur..len].fill(b' ');
-            InLineComment
-        }
-    }
-}
-
-#[inline(always)]
-fn consume_block_comments(buf: &mut [u8], i: &mut usize) -> State {
-    let cur = *i;
-    let remaining = &buf[*i..];
-    match memchr::memchr(b'*', remaining) {
-        Some(offset) => {
-            *i += offset;
-            buf[cur..=*i].fill(b' ');
-            MaybeCommentEnd
-        }
-        None => {
-            let len = buf.len();
-            *i = len - 1;
-            buf[cur..len].fill(b' ');
-            InBlockComment
-        }
-    }
-}
-
-#[inline(always)]
-fn top(c: &mut u8) -> State {
-    match *c {
-        b'"' => InString,
-        b'/' => {
-            *c = b' ';
-            InComment
-        }
-        b'#' => {
-            *c = b' ';
-            InLineComment
-        }
-        _ => Top,
-    }
-}
-
-#[inline(always)]
-fn in_string(c: u8) -> State {
-    match c {
-        b'"' => Top,
-        b'\\' => StringEscape,
-        _ => InString,
-    }
-}
-
-#[inline]
-fn in_comment(c: &mut u8) -> Result<State> {
-    let new_state = match *c {
-        b'*' => InBlockComment,
-        b'/' => InLineComment,
-        _ => return Err(ErrorKind::InvalidData.into()),
-    };
-    *c = b' ';
-    Ok(new_state)
-}
-
-#[inline]
-fn maybe_comment_end(c: &mut u8) -> State {
-    let old = *c;
-    *c = b' ';
-    match old {
-        b'/' => Top,
-        b'*' => MaybeCommentEnd,
-        _ => InBlockComment,
-    }
-}
