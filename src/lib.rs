@@ -188,14 +188,20 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
             }
             InBlockComment => {
                 let old = *c;
-                *c = b' ';
+                // Preserve newlines in block comments
+                if old != b'\n' && old != b'\r' {
+                    *c = b' ';
+                }
                 if old == b'*' {
                     *state = MaybeCommentEnd;
                 }
             }
             MaybeCommentEnd => {
                 let old = *c;
-                *c = b' ';
+                // Preserve newlines in block comments
+                if old != b'\n' && old != b'\r' {
+                    *c = b' ';
+                }
                 match old {
                     b'/' => *state = Top,
                     b'*' => *state = MaybeCommentEnd,
@@ -205,7 +211,8 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
             InLineComment => {
                 if *c == b'\n' {
                     *state = Top;
-                } else {
+                } else if *c != b'\r' {
+                    // Preserve \r as well (for \r\n line endings)
                     *c = b' ';
                 }
             }

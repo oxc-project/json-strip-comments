@@ -502,3 +502,134 @@ fn regex_patterns_in_strings() {
     assert!(stripped.contains("(?://not-comment|#also-not),"));
     assert!(stripped.contains("SELECT * FROM table WHERE col = '//value,/*data*/'"));
 }
+
+// Tests ported from https://github.com/sindresorhus/strip-json-comments/blob/main/test.js
+
+#[test]
+fn sindresorhus_replace_comments_with_whitespace() {
+    assert_eq!(strip_string("//comment\n{\"a\":\"b\"}"), "         \n{\"a\":\"b\"}");
+    assert_eq!(strip_string("/*//comment*/{\"a\":\"b\"}"), "             {\"a\":\"b\"}");
+    assert_eq!(strip_string("{\"a\":\"b\"//comment\n}"), "{\"a\":\"b\"         \n}");
+    assert_eq!(strip_string("{\"a\":\"b\"/*comment*/}"), "{\"a\":\"b\"           }");
+    assert_eq!(strip_string("{\"a\"/*\n\n\ncomment\r\n*/:\"b\"}"), "{\"a\"  \n\n\n       \r\n  :\"b\"}");
+    assert_eq!(strip_string("/*!\n * comment\n */\n{\"a\":\"b\"}"), "   \n          \n   \n{\"a\":\"b\"}");
+    assert_eq!(strip_string("{/*comment*/\"a\":\"b\"}"), "{           \"a\":\"b\"}");
+}
+
+#[test]
+fn sindresorhus_doesnt_strip_comments_inside_strings() {
+    assert_eq!(strip_string("{\"a\":\"b//c\"}"), "{\"a\":\"b//c\"}");
+    assert_eq!(strip_string("{\"a\":\"b/*c*/\"}"), "{\"a\":\"b/*c*/\"}");
+    assert_eq!(strip_string("{\"/*a\":\"b\"}"), "{\"/*a\":\"b\"}");
+    assert_eq!(strip_string("{\"\\\\/\\*a\":\"b\"}"), "{\"\\\\/\\*a\":\"b\"}");
+}
+
+#[test]
+fn sindresorhus_consider_escaped_slashes() {
+    assert_eq!(strip_string("{\"\\\\\\\\\":\"https://foobar.com\"}"), "{\"\\\\\\\\\":\"https://foobar.com\"}");
+    assert_eq!(strip_string("{\"foo\\\\\\\"\":\"https://foobar.com\"}"), "{\"foo\\\\\\\"\":\"https://foobar.com\"}");
+}
+
+#[test]
+fn sindresorhus_line_endings_no_comments() {
+    assert_eq!(strip_string("{\"a\":\"b\"\n}"), "{\"a\":\"b\"\n}");
+    assert_eq!(strip_string("{\"a\":\"b\"\r\n}"), "{\"a\":\"b\"\r\n}");
+}
+
+#[test]
+fn sindresorhus_line_endings_single_line_comment() {
+    assert_eq!(strip_string("{\"a\":\"b\"//c\n}"), "{\"a\":\"b\"   \n}");
+    assert_eq!(strip_string("{\"a\":\"b\"//c\r\n}"), "{\"a\":\"b\"   \r\n}");
+}
+
+#[test]
+fn sindresorhus_line_endings_single_line_block_comment() {
+    assert_eq!(strip_string("{\"a\":\"b\"/*c*/\n}"), "{\"a\":\"b\"     \n}");
+    assert_eq!(strip_string("{\"a\":\"b\"/*c*/\r\n}"), "{\"a\":\"b\"     \r\n}");
+}
+
+#[test]
+fn sindresorhus_line_endings_multi_line_block_comment() {
+    assert_eq!(strip_string("{\"a\":\"b\",/*c\nc2*/\"x\":\"y\"\n}"), "{\"a\":\"b\",   \n    \"x\":\"y\"\n}");
+    assert_eq!(strip_string("{\"a\":\"b\",/*c\r\nc2*/\"x\":\"y\"\r\n}"), "{\"a\":\"b\",   \r\n    \"x\":\"y\"\r\n}");
+}
+
+#[test]
+fn sindresorhus_line_endings_works_at_eof() {
+    assert_eq!(strip_string("{\r\n\t\"a\":\"b\"\r\n} //EOF"), "{\r\n\t\"a\":\"b\"\r\n}      ");
+}
+
+#[test]
+fn sindresorhus_handles_weird_escaping() {
+    let input = r#"{"x":"x \"sed -e \\\"s/^.\\\\{46\\\\}T//\\\" -e \\\"s/#033/\\\\x1b/g\\\"\""}"#;
+    assert_eq!(strip_string(input), input);
+}
+
+#[test]
+fn sindresorhus_strips_trailing_commas() {
+    // Our implementation strips trailing commas by default
+    assert_eq!(strip_string("{\"x\":true,}"), "{\"x\":true }");
+    assert_eq!(strip_string("{\"x\":true,\n  }"), "{\"x\":true \n  }");
+    assert_eq!(strip_string("[true, false,]"), "[true, false ]");
+
+    // Complex nested case with trailing commas
+    let input = "{\n  \"array\": [\n    true,\n    false,\n  ],\n}";
+    let output = strip_string(input);
+    // The trailing commas should be removed
+    assert!(output.contains("false \n"));
+    assert!(!output.contains("false,\n  ],"));
+}
+
+#[test]
+fn sindresorhus_strips_trailing_commas_with_comments() {
+    let input = "{\n  \"array\": [\n    true,\n    false /* comment */ ,\n /*comment*/ ],\n}";
+    let output = strip_string(input);
+    // Comments should be replaced with spaces, trailing comma removed
+    assert!(output.contains("false"));
+    assert!(output.contains("true,"));
+    // The final trailing comma before ] should be removed
+    assert!(!output.contains(",\n               ],"));
+}
+
+#[test]
+fn sindresorhus_handles_malformed_block_comments() {
+    // Both of these are malformed and should error in our implementation
+    // sindresorhus appears to pass them through, but we treat them as errors
+
+    // */ without matching /* - when using StripComments reader, this errors
+    // because */ leaves us in InComment state at EOF
+    let mut test1 = String::from("[] */");
+    let result1 = strip_comments_in_place(&mut test1);
+    // strip_comments_in_place doesn't check final state, so it succeeds
+    assert!(result1.is_ok());
+    assert_eq!(test1, "[] * ");
+
+    // /* without matching */ - leaves us in InBlockComment state at EOF
+    let mut test2 = String::from("[] /*");
+    let result2 = strip_comments_in_place(&mut test2);
+    assert!(result2.is_ok());
+    assert_eq!(test2, "[]   ");
+
+    // However, using StripComments reader, both should error at EOF
+    use std::io::Read;
+    let mut stripped1 = String::new();
+    let err1 = StripComments::new("[] */".as_bytes()).read_to_string(&mut stripped1).unwrap_err();
+    assert_eq!(err1.kind(), ErrorKind::InvalidData);
+
+    let mut stripped2 = String::new();
+    let err2 = StripComments::new("[] /*".as_bytes()).read_to_string(&mut stripped2).unwrap_err();
+    assert_eq!(err2.kind(), ErrorKind::InvalidData);
+}
+
+#[test]
+fn sindresorhus_handles_non_breaking_space() {
+    let fixture = "{\n\t// Comment with non-breaking-space: '\u{00A0}'\n\t\"a\": 1\n\t}";
+    let stripped = strip_string(fixture);
+
+    // Should be valid JSON after stripping
+    let parsed: serde_json::Result<serde_json::Value> = serde_json::from_str(&stripped);
+    assert!(parsed.is_ok());
+    if let Ok(value) = parsed {
+        assert_eq!(value["a"], 1);
+    }
+}
