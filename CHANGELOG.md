@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.1.0...json-strip-comments-v3.1.1) - 2025-12-21
+
+### Other
+
+- *(deps)* update oxc-project/setup-rust action to v1.0.12 ([#129](https://github.com/oxc-project/json-strip-comments/pull/129))
+- *(deps)* update dependency rust to v1.92.0 ([#127](https://github.com/oxc-project/json-strip-comments/pull/127))
+- *(deps)* update actions/setup-node action to v6.1.0 ([#126](https://github.com/oxc-project/json-strip-comments/pull/126))
+- Setup OIDC for CodSpeed authentication ([#125](https://github.com/oxc-project/json-strip-comments/pull/125))
+- *(deps)* update oxc-project/setup-rust action to v1.0.11 ([#123](https://github.com/oxc-project/json-strip-comments/pull/123))
+- *(deps)* update github-actions ([#121](https://github.com/oxc-project/json-strip-comments/pull/121))
+- port tests from sindresorhus/strip-json-comments ([#118](https://github.com/oxc-project/json-strip-comments/pull/118))
+
 ## [3.1.0](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.0.1...json-strip-comments-v3.1.0) - 2025-11-21
 
 ### Added
