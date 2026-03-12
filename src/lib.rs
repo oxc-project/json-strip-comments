@@ -169,34 +169,75 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
 
-    // Fast path for Top state which is most common
     while i < len {
-        let c = &mut buf[i];
-
-        match state {
+        match *state {
             Top => {
-                let cur = i;
-                let new_state = top(c);
-                if *c == b',' {
-                    let mut temp_state = new_state;
-                    if consume_comment_whitespace_until_maybe_bracket(&mut temp_state, buf, &mut i)?
-                    {
-                        buf[cur] = b' ';
+                // SIMD-accelerated scan for interesting bytes: " / # ,
+                let rest = &buf[i..];
+                let p1 = memchr::memchr3(b'"', b'/', b'#', rest);
+                let p2 = memchr::memchr(b',', rest);
+
+                let next = match (p1, p2) {
+                    (Some(a), Some(b)) => Some(a.min(b)),
+                    (a @ Some(_), None) | (None, a @ Some(_)) => a,
+                    (None, None) => None,
+                };
+
+                match next {
+                    Some(offset) => {
+                        i += offset;
+                        let c = &mut buf[i];
+                        if *c == b',' {
+                            let cur = i;
+                            let mut temp_state = Top;
+                            if consume_comment_whitespace_until_maybe_bracket(
+                                &mut temp_state,
+                                buf,
+                                &mut i,
+                            )? {
+                                buf[cur] = b' ';
+                            }
+                            *state = temp_state;
+                        } else {
+                            *state = top(c);
+                        }
+                        i += 1;
                     }
-                    *state = temp_state;
-                } else {
-                    *state = new_state;
+                    None => return Ok(()),
                 }
             }
-            InString => *state = in_string(*c),
-            StringEscape => *state = InString,
-            InComment => *state = in_comment(c)?,
-            InBlockComment => *state = consume_block_comments(buf, &mut i),
-            MaybeCommentEnd => *state = maybe_comment_end(c),
-            InLineComment => *state = consume_line_comments(buf, &mut i),
+            InString => {
+                // SIMD-accelerated scan for string-ending chars: " or \
+                match memchr::memchr2(b'"', b'\\', &buf[i..]) {
+                    Some(offset) => {
+                        i += offset;
+                        *state = in_string(buf[i]);
+                        i += 1;
+                    }
+                    None => return Ok(()),
+                }
+            }
+            StringEscape => {
+                *state = InString;
+                i += 1;
+            }
+            InComment => {
+                *state = in_comment(&mut buf[i])?;
+                i += 1;
+            }
+            InBlockComment => {
+                *state = consume_block_comments(buf, &mut i);
+                i += 1;
+            }
+            MaybeCommentEnd => {
+                *state = maybe_comment_end(&mut buf[i]);
+                i += 1;
+            }
+            InLineComment => {
+                *state = consume_line_comments(buf, &mut i);
+                i += 1;
+            }
         }
-
-        i += 1;
     }
     Ok(())
 }

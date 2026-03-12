@@ -420,6 +420,277 @@ fn slice_api() {
     assert!(json.contains(r#""b": 2"#));
 }
 
+// Tests for SIMD-accelerated code paths (memchr-based scanning)
+
+// Top state: memchr returns None (no interesting bytes at all)
+#[test]
+fn no_interesting_bytes() {
+    let mut json = String::from("12345 67890");
+    strip(&mut json).unwrap();
+    assert_eq!(json, "12345 67890");
+}
+
+// Top state: only commas, no quotes/comments (memchr3 returns None, memchr finds comma)
+#[test]
+fn only_commas_no_quotes_or_comments() {
+    let mut json = String::from("{a:1,b:2,c:3}");
+    strip(&mut json).unwrap();
+    assert_eq!(json, "{a:1,b:2,c:3}");
+}
+
+// Top state: only quotes, no commas (memchr finds None for comma, memchr3 finds quote)
+#[test]
+fn only_quotes_no_commas() {
+    let mut json = String::from(r#"{"key": "value"}"#);
+    strip(&mut json).unwrap();
+    assert_eq!(json, r#"{"key": "value"}"#);
+}
+
+// InString state: long string with no special chars (memchr2 scans many bytes)
+#[test]
+fn long_string_no_escapes() {
+    let long_content = "a".repeat(1000);
+    let mut json = format!(r#"{{"key": "{}"}}"#, long_content);
+    let expected = json.clone();
+    strip(&mut json).unwrap();
+    assert_eq!(json, expected);
+}
+
+// InString state: long string with escapes throughout (memchr2 finds backslashes)
+#[test]
+fn long_string_many_escapes() {
+    // String with alternating normal chars and escape sequences
+    let mut content = String::new();
+    for _ in 0..100 {
+        content.push_str(r#"ab\"cd\\"#);
+    }
+    let mut json = format!(r#"{{"key": "{}"}}"#, content);
+    let expected = json.clone();
+    strip(&mut json).unwrap();
+    assert_eq!(json, expected);
+}
+
+// InString state: string continues past buffer end (streaming, memchr2 returns None)
+#[test]
+fn string_spans_multiple_reads() {
+    let long_value = "x".repeat(200);
+    let json = format!(r#"{{"key": "{}"}}"#, long_value);
+    let mut reader = StripComments::new(json.as_bytes());
+    let mut buf = [0u8; 16]; // Small buffer forces multiple reads mid-string
+    let mut result = Vec::new();
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => result.extend_from_slice(&buf[..n]),
+            Err(e) => panic!("Unexpected error: {}", e),
+        }
+    }
+    let stripped = String::from_utf8(result).unwrap();
+    assert_eq!(stripped, json);
+}
+
+// Top state: comma is found before any quote/comment (memchr wins over memchr3)
+#[test]
+fn comma_before_any_quote_or_comment() {
+    let mut json = String::from("{a:1,b:2}");
+    strip(&mut json).unwrap();
+    assert_eq!(json, "{a:1,b:2}");
+}
+
+// Trailing comma with only whitespace before bracket (no comments between)
+#[test]
+fn trailing_comma_whitespace_only_before_bracket() {
+    let mut json = String::from("{a:1,   }");
+    strip(&mut json).unwrap();
+    assert_eq!(json, "{a:1    }");
+}
+
+// Trailing comma at very end of buffer (comma found, consume_comment looks ahead to end)
+#[test]
+fn trailing_comma_at_buffer_end() {
+    let mut json = String::from("[1,");
+    strip(&mut json).unwrap();
+    assert_eq!(json, "[1,");
+}
+
+// Non-trailing comma: comma followed by non-bracket content
+#[test]
+fn non_trailing_comma_followed_by_value() {
+    let mut json = String::from(r#"[1, 2, "three"]"#);
+    strip(&mut json).unwrap();
+    assert_eq!(json, r#"[1, 2, "three"]"#);
+}
+
+// Multiple trailing commas in nested structures
+#[test]
+fn multiple_trailing_commas_nested() {
+    let mut json = String::from(r#"{"a": [1, 2,], "b": {"c": 3,},}"#);
+    strip(&mut json).unwrap();
+    assert_eq!(json, r#"{"a": [1, 2 ], "b": {"c": 3 } }"#);
+}
+
+// Hash comment immediately after non-whitespace
+#[test]
+fn hash_comment_no_leading_whitespace() {
+    let mut json = String::from("{\"a\":1}#comment");
+    strip(&mut json).unwrap();
+    assert_eq!(json, "{\"a\":1}        ");
+}
+
+// Large gap of non-interesting bytes between quotes (SIMD skip in Top)
+#[test]
+fn large_gap_between_strings() {
+    let padding = " ".repeat(500);
+    let mut json = format!(r#"{{"key":{}"value"}}"#, padding);
+    let expected = json.clone();
+    strip(&mut json).unwrap();
+    assert_eq!(json, expected);
+}
+
+// Alternating strings and comments (exercises Top→InString→Top→InComment cycles)
+#[test]
+fn alternating_strings_and_comments() {
+    let mut json = String::from("\"a\"/* c1 */\"b\"// c2\n\"c\"# c3\n\"d\"");
+    strip(&mut json).unwrap();
+    assert!(json.contains("\"a\""));
+    assert!(json.contains("\"b\""));
+    assert!(json.contains("\"c\""));
+    assert!(json.contains("\"d\""));
+    assert!(!json.contains("c1"));
+    assert!(!json.contains("c2"));
+    assert!(!json.contains("c3"));
+}
+
+// Trailing comma followed by line comment then bracket
+#[test]
+fn trailing_comma_line_comment_then_bracket() {
+    let mut json = String::from("[1, // comment\n]");
+    strip(&mut json).unwrap();
+    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
+    assert_eq!(no_ws, "[1]");
+}
+
+// Trailing comma followed by block comment then bracket
+#[test]
+fn trailing_comma_block_comment_then_bracket() {
+    let mut json = String::from("[1, /* comment */ ]");
+    strip(&mut json).unwrap();
+    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
+    assert_eq!(no_ws, "[1]");
+}
+
+// Trailing comma followed by hash comment then bracket
+#[test]
+fn trailing_comma_hash_comment_then_bracket() {
+    let mut json = String::from("[1, # comment\n]");
+    strip(&mut json).unwrap();
+    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
+    assert_eq!(no_ws, "[1]");
+}
+
+// Trailing comma with multiple mixed comments before bracket
+#[test]
+fn trailing_comma_multiple_comments_before_bracket() {
+    let mut json = String::from("[1, /* a */ // b\n/* c */]");
+    strip(&mut json).unwrap();
+    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
+    assert_eq!(no_ws, "[1]");
+}
+
+// String with escape at very end of small buffer (streaming: StringEscape spans reads)
+#[test]
+fn escape_at_buffer_boundary() {
+    let json = r#"{"key": "val\"ue"}"#;
+    let mut reader = StripComments::new(json.as_bytes());
+    let mut buf = [0u8; 13]; // Buffer ends right at or near the backslash
+    let mut result = Vec::new();
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => result.extend_from_slice(&buf[..n]),
+            Err(e) => panic!("Unexpected error: {}", e),
+        }
+    }
+    let stripped = String::from_utf8(result).unwrap();
+    assert_eq!(stripped, json);
+}
+
+// Block comment spanning multiple small reads (streaming: InBlockComment spans reads)
+#[test]
+fn block_comment_spans_multiple_reads() {
+    let comment_body = "x".repeat(100);
+    let json = format!(r#"{{"a": 1 /* {} */ "b": 2}}"#, comment_body);
+    let mut reader = StripComments::new(json.as_bytes());
+    let mut buf = [0u8; 16];
+    let mut result = Vec::new();
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => result.extend_from_slice(&buf[..n]),
+            Err(e) => panic!("Unexpected error: {}", e),
+        }
+    }
+    let stripped = String::from_utf8(result).unwrap();
+    assert!(stripped.contains(r#""a": 1"#));
+    assert!(stripped.contains(r#""b": 2"#));
+    assert!(!stripped.contains("xxx"));
+}
+
+// Line comment spanning multiple small reads
+#[test]
+fn line_comment_spans_multiple_reads() {
+    let comment_body = "x".repeat(100);
+    let json = format!("{{\"a\": 1 // {}\n\"b\": 2}}", comment_body);
+    let mut reader = StripComments::new(json.as_bytes());
+    let mut buf = [0u8; 16];
+    let mut result = Vec::new();
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => result.extend_from_slice(&buf[..n]),
+            Err(e) => panic!("Unexpected error: {}", e),
+        }
+    }
+    let stripped = String::from_utf8(result).unwrap();
+    assert!(stripped.contains(r#""a": 1"#));
+    assert!(stripped.contains(r#""b": 2"#));
+}
+
+// Single byte input variants
+#[test]
+fn single_byte_inputs() {
+    let mut s = String::from("1");
+    strip(&mut s).unwrap();
+    assert_eq!(s, "1");
+
+    let mut s = String::from(",");
+    strip(&mut s).unwrap();
+    assert_eq!(s, ",");
+
+    let mut s = String::from(" ");
+    strip(&mut s).unwrap();
+    assert_eq!(s, " ");
+}
+
+// Input with no strings but has comments (Top→InComment without passing through InString)
+#[test]
+fn comments_without_strings() {
+    let mut json = String::from("{a: 1 /* comment */, b: 2 // line\n}");
+    strip(&mut json).unwrap();
+    assert!(json.contains("a: 1"));
+    assert!(json.contains("b: 2"));
+    assert!(!json.contains("comment"));
+    assert!(!json.contains("line"));
+}
+
+// Verify exact output for comma not followed by bracket (non-trailing)
+#[test]
+fn comma_followed_by_string_key() {
+    let mut json = String::from(r#"{"a": 1, "b": 2}"#);
+    strip(&mut json).unwrap();
+    assert_eq!(json, r#"{"a": 1, "b": 2}"#);
+}
+
 // Ported from https://github.com/sindresorhus/strip-json-comments/blob/main/test.js
 
 #[test]
