@@ -9,6 +9,26 @@ fn strip_string(input: &str) -> String {
     out
 }
 
+fn strip_string_chunked(input: &str, buf_size: usize) -> String {
+    let mut reader = StripComments::new(input.as_bytes());
+    let mut buf = vec![0u8; buf_size];
+    let mut result = Vec::new();
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => result.extend_from_slice(&buf[..n]),
+            Err(e) => panic!("Unexpected error: {e}"),
+        }
+    }
+    String::from_utf8(result).unwrap()
+}
+
+fn strip_without_whitespace(input: &str) -> String {
+    let mut json = String::from(input);
+    strip(&mut json).unwrap();
+    json.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
 #[test]
 fn block_comments() {
     let json = r#"{/* Comment */"hi": /** abc */ "bye"}"#;
@@ -475,17 +495,7 @@ fn long_string_many_escapes() {
 fn string_spans_multiple_reads() {
     let long_value = "x".repeat(200);
     let json = format!(r#"{{"key": "{}"}}"#, long_value);
-    let mut reader = StripComments::new(json.as_bytes());
-    let mut buf = [0u8; 16]; // Small buffer forces multiple reads mid-string
-    let mut result = Vec::new();
-    loop {
-        match reader.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => result.extend_from_slice(&buf[..n]),
-            Err(e) => panic!("Unexpected error: {}", e),
-        }
-    }
-    let stripped = String::from_utf8(result).unwrap();
+    let stripped = strip_string_chunked(&json, 16);
     assert_eq!(stripped, json);
 }
 
@@ -564,54 +574,32 @@ fn alternating_strings_and_comments() {
 // Trailing comma followed by line comment then bracket
 #[test]
 fn trailing_comma_line_comment_then_bracket() {
-    let mut json = String::from("[1, // comment\n]");
-    strip(&mut json).unwrap();
-    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
-    assert_eq!(no_ws, "[1]");
+    assert_eq!(strip_without_whitespace("[1, // comment\n]"), "[1]");
 }
 
 // Trailing comma followed by block comment then bracket
 #[test]
 fn trailing_comma_block_comment_then_bracket() {
-    let mut json = String::from("[1, /* comment */ ]");
-    strip(&mut json).unwrap();
-    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
-    assert_eq!(no_ws, "[1]");
+    assert_eq!(strip_without_whitespace("[1, /* comment */ ]"), "[1]");
 }
 
 // Trailing comma followed by hash comment then bracket
 #[test]
 fn trailing_comma_hash_comment_then_bracket() {
-    let mut json = String::from("[1, # comment\n]");
-    strip(&mut json).unwrap();
-    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
-    assert_eq!(no_ws, "[1]");
+    assert_eq!(strip_without_whitespace("[1, # comment\n]"), "[1]");
 }
 
 // Trailing comma with multiple mixed comments before bracket
 #[test]
 fn trailing_comma_multiple_comments_before_bracket() {
-    let mut json = String::from("[1, /* a */ // b\n/* c */]");
-    strip(&mut json).unwrap();
-    let no_ws: String = json.chars().filter(|c| !c.is_whitespace()).collect();
-    assert_eq!(no_ws, "[1]");
+    assert_eq!(strip_without_whitespace("[1, /* a */ // b\n/* c */]"), "[1]");
 }
 
 // String with escape at very end of small buffer (streaming: StringEscape spans reads)
 #[test]
 fn escape_at_buffer_boundary() {
     let json = r#"{"key": "val\"ue"}"#;
-    let mut reader = StripComments::new(json.as_bytes());
-    let mut buf = [0u8; 13]; // Buffer ends right at or near the backslash
-    let mut result = Vec::new();
-    loop {
-        match reader.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => result.extend_from_slice(&buf[..n]),
-            Err(e) => panic!("Unexpected error: {}", e),
-        }
-    }
-    let stripped = String::from_utf8(result).unwrap();
+    let stripped = strip_string_chunked(json, 13);
     assert_eq!(stripped, json);
 }
 
@@ -620,17 +608,7 @@ fn escape_at_buffer_boundary() {
 fn block_comment_spans_multiple_reads() {
     let comment_body = "x".repeat(100);
     let json = format!(r#"{{"a": 1 /* {} */ "b": 2}}"#, comment_body);
-    let mut reader = StripComments::new(json.as_bytes());
-    let mut buf = [0u8; 16];
-    let mut result = Vec::new();
-    loop {
-        match reader.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => result.extend_from_slice(&buf[..n]),
-            Err(e) => panic!("Unexpected error: {}", e),
-        }
-    }
-    let stripped = String::from_utf8(result).unwrap();
+    let stripped = strip_string_chunked(&json, 16);
     assert!(stripped.contains(r#""a": 1"#));
     assert!(stripped.contains(r#""b": 2"#));
     assert!(!stripped.contains("xxx"));
@@ -641,17 +619,7 @@ fn block_comment_spans_multiple_reads() {
 fn line_comment_spans_multiple_reads() {
     let comment_body = "x".repeat(100);
     let json = format!("{{\"a\": 1 // {}\n\"b\": 2}}", comment_body);
-    let mut reader = StripComments::new(json.as_bytes());
-    let mut buf = [0u8; 16];
-    let mut result = Vec::new();
-    loop {
-        match reader.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => result.extend_from_slice(&buf[..n]),
-            Err(e) => panic!("Unexpected error: {}", e),
-        }
-    }
-    let stripped = String::from_utf8(result).unwrap();
+    let stripped = strip_string_chunked(&json, 16);
     assert!(stripped.contains(r#""a": 1"#));
     assert!(stripped.contains(r#""b": 2"#));
 }
