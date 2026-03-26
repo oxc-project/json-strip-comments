@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.1.0...json-strip-comments-v3.1.1) - 2026-03-26
+
+### Other
+
+- *(deps)* update dependency rust to v1.94.1 ([#160](https://github.com/oxc-project/json-strip-comments/pull/160))
+- *(deps)* update pnpm/action-setup action to v5 ([#159](https://github.com/oxc-project/json-strip-comments/pull/159))
+- *(deps)* update codspeedhq/action action to v4.12.1 ([#158](https://github.com/oxc-project/json-strip-comments/pull/158))
+- *(deps)* update rust crates ([#157](https://github.com/oxc-project/json-strip-comments/pull/157))
+- *(deps)* update github-actions ([#156](https://github.com/oxc-project/json-strip-comments/pull/156))
+- *(deps)* update github-actions ([#154](https://github.com/oxc-project/json-strip-comments/pull/154))
+- *(deps)* update dependency rust to v1.94.0 ([#153](https://github.com/oxc-project/json-strip-comments/pull/153))
+- *(deps)* update github-actions ([#152](https://github.com/oxc-project/json-strip-comments/pull/152))
+- *(deps)* update codspeedhq/action action to v4.10.6 ([#148](https://github.com/oxc-project/json-strip-comments/pull/148))
+- *(deps)* update dependency rust to v1.93.1 ([#147](https://github.com/oxc-project/json-strip-comments/pull/147))
+- *(deps)* update rust crates ([#146](https://github.com/oxc-project/json-strip-comments/pull/146))
+- *(deps)* update codspeedhq/action action to v4.10.5 ([#145](https://github.com/oxc-project/json-strip-comments/pull/145))
+- *(deps)* update codspeedhq/action action to v4.10.2 ([#144](https://github.com/oxc-project/json-strip-comments/pull/144))
+- *(deps)* update github-actions ([#142](https://github.com/oxc-project/json-strip-comments/pull/142))
+- *(deps)* update dependency rust to v1.93.0 ([#140](https://github.com/oxc-project/json-strip-comments/pull/140))
+- *(deps)* update github-actions ([#138](https://github.com/oxc-project/json-strip-comments/pull/138))
+- *(deps)* update taiki-e/checkout-action action to v1.3.2 ([#137](https://github.com/oxc-project/json-strip-comments/pull/137))
+- *(deps)* update rust crates ([#136](https://github.com/oxc-project/json-strip-comments/pull/136))
+- *(deps)* update codspeedhq/action action to v4.5.2 ([#134](https://github.com/oxc-project/json-strip-comments/pull/134))
+- *(deps)* update github-actions ([#133](https://github.com/oxc-project/json-strip-comments/pull/133))
+- *(deps)* update rust crates ([#132](https://github.com/oxc-project/json-strip-comments/pull/132))
+- *(deps)* update oxc-project/setup-rust action to v1.0.12 ([#129](https://github.com/oxc-project/json-strip-comments/pull/129))
+- *(deps)* update dependency rust to v1.92.0 ([#127](https://github.com/oxc-project/json-strip-comments/pull/127))
+- *(deps)* update actions/setup-node action to v6.1.0 ([#126](https://github.com/oxc-project/json-strip-comments/pull/126))
+- Setup OIDC for CodSpeed authentication ([#125](https://github.com/oxc-project/json-strip-comments/pull/125))
+- *(deps)* update oxc-project/setup-rust action to v1.0.11 ([#123](https://github.com/oxc-project/json-strip-comments/pull/123))
+- *(deps)* update github-actions ([#121](https://github.com/oxc-project/json-strip-comments/pull/121))
+- port tests from sindresorhus/strip-json-comments ([#118](https://github.com/oxc-project/json-strip-comments/pull/118))
+
 ## [3.1.0](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.0.1...json-strip-comments-v3.1.0) - 2025-11-21
 
 ### Added
