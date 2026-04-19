@@ -430,10 +430,7 @@ fn sindresorhus_replace_comments_with_whitespace() {
     assert_eq!(strip_string("{\"a\":\"b\"/*comment*/}"), "{\"a\":\"b\"           }");
     // Note: The Rust implementation replaces newlines in block comments with spaces,
     // unlike the JavaScript version which preserves them
-    assert_eq!(
-        strip_string("{\"a\"/*\n\n\ncomment\r\n*/:\"b\"}"),
-        "{\"a\"                :\"b\"}"
-    );
+    assert_eq!(strip_string("{\"a\"/*\n\n\ncomment\r\n*/:\"b\"}"), "{\"a\"                :\"b\"}");
     // Note: Same for multi-line comments
     assert_eq!(
         strip_string("/*!\n * comment\n */\n{\"a\":\"b\"}"),
@@ -496,10 +493,7 @@ fn sindresorhus_line_endings_multi_line_block_comment() {
 
 #[test]
 fn sindresorhus_line_endings_works_at_eof() {
-    assert_eq!(
-        strip_string("{\r\n\t\"a\":\"b\"\r\n} //EOF"),
-        "{\r\n\t\"a\":\"b\"\r\n}      "
-    );
+    assert_eq!(strip_string("{\r\n\t\"a\":\"b\"\r\n} //EOF"), "{\r\n\t\"a\":\"b\"\r\n}      ");
 }
 
 #[test]
