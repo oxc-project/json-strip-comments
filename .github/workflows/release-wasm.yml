@@ -1,0 +1,81 @@
+name: Release WASM
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - wasm/package.json
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.version.outputs.changed }}
+    steps:
+      - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+
+      - name: Check version changes
+        uses: EndBug/version-check@095362f3cd50f690c8fa0e6afeea81834bd8d320 # v3.0.0
+        id: version
+        with:
+          static-checking: localIsNew
+          file-url: https://unpkg.com/json-strip-comments@latest/package.json
+          file-name: wasm/package.json
+
+      - name: Set version name
+        if: steps.version.outputs.changed == 'true'
+        env:
+          version: ${{ steps.version.outputs.version }}
+        run: echo "version=${version}"
+
+  publish:
+    name: Publish WASM NPM
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # for `pnpm publish --provenance`
+    needs:
+      - check
+    if: needs.check.outputs.version_changed == 'true'
+    steps:
+      - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+
+      - uses: oxc-project/setup-rust@23f38cfb0c04af97a055f76acee94d5be71c7c82 # v1.0.16
+        with:
+          cache-key: wasm-release
+          save-cache: ${{ github.ref_name == 'main' }}
+          tools: wasm-pack
+
+      - uses: pnpm/action-setup@078e9d416474b29c0c387560859308974f7e9c53 # v6.0.1
+        with:
+          package_json_file: ./wasm/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          cache: pnpm
+          cache-dependency-path: ./wasm/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: wasm
+        run: pnpm install --frozen-lockfile
+
+      - name: Build npm package
+        working-directory: wasm
+        run: |
+          rustup target add wasm32-unknown-unknown
+          pnpm run build
+          pnpm run test
+
+      - name: Publish npm package as latest
+        run: |
+          # Using trusted publishing, no token is required.
+          pnpm publish ./npm --tag latest --provenance --access public --no-git-checks
