@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.1.1...json-strip-comments-v3.1.2) - 2026-05-03
+
+### Other
+
+- *(deps)* update pnpm/action-setup action to v6.0.4 ([#175](https://github.com/oxc-project/json-strip-comments/pull/175))
+- *(deps)* update github actions ([#174](https://github.com/oxc-project/json-strip-comments/pull/174))
+- *(deps)* update github-actions ([#172](https://github.com/oxc-project/json-strip-comments/pull/172))
+
 ## [3.1.0](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.0.1...json-strip-comments-v3.1.0) - 2025-11-21
 
 ### Added
