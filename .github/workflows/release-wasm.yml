@@ -52,7 +52,7 @@ jobs:
         with:
           cache-key: wasm-release
           save-cache: ${{ github.ref_name == 'main' }}
-          tools: wasm-pack
+          tools: wasm-pack@0.13.1
 
       - uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
         with:

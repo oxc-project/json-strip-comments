@@ -38,7 +38,7 @@ jobs:
         with:
           save-cache: ${{ github.ref_name == 'main' }}
           cache-key: wasm
-          tools: wasm-pack
+          tools: wasm-pack@0.13.1
 
       - name: Check
         run: |
