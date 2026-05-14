@@ -38,7 +38,9 @@ jobs:
         with:
           save-cache: ${{ github.ref_name == 'main' }}
           cache-key: wasm
-          tools: wasm-pack@0.13.1
+
+      - name: Install wasm-pack
+        run: cargo install --locked wasm-pack --version 0.13.1
 
       - name: Check
         run: |
