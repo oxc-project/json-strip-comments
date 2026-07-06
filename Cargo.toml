@@ -4,7 +4,7 @@ members = [".", "wasm"]
 
 [workspace.package]
 edition = "2024"
-license = "MIT"
+license = "Apache-2.0"
 rust-version = "1.85.0"
 
 [package]
