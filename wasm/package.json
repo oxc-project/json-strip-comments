@@ -1,7 +1,7 @@
 {
   "name": "json-strip-comments",
   "version": "3.0.1",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "Wasm for JSON Strip Comments (jsonc)",
   "keywords": ["jsonc", "json", "strip", "comments"],
   "repository": {
