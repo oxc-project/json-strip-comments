@@ -31,3 +31,9 @@ codspeed = ["criterion2/codspeed"]
 
 [dependencies]
 memchr = "2.7.5"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
