@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.3](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.1.2...json-strip-comments-v3.1.3) - 2026-10-16
+
+### Other
+
+- *(deps)* update rust crates ([#226](https://github.com/oxc-project/json-strip-comments/pull/226))
+- reduce Rust dev debug info ([#217](https://github.com/oxc-project/json-strip-comments/pull/217))
+
 ## [3.1.2](https://github.com/oxc-project/json-strip-comments/compare/json-strip-comments-v3.1.1...json-strip-comments-v3.1.2) - 2026-07-27
 
 ### Other
