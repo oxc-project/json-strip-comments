@@ -567,3 +567,31 @@ fn sindresorhus_non_breaking_space() {
         assert_eq!(value["a"], 1);
     }
 }
+
+#[test]
+fn consecutive_commas_are_kept() {
+    let mut json = String::from("[1,,]");
+    strip_comments_in_place(&mut json).unwrap();
+    assert_eq!(json, "[1,,]");
+
+    let mut json = String::from("[1, /* x */ ,]");
+    strip_comments_in_place(&mut json).unwrap();
+    assert_eq!(json, "[1,         ,]");
+}
+
+#[test]
+fn escape_at_chunk_boundary() {
+    struct OneByte<'a>(&'a [u8]);
+    impl Read for OneByte<'_> {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let n = self.0.len().min(1).min(buf.len());
+            buf[..n].copy_from_slice(&self.0[..n]);
+            self.0 = &self.0[n..];
+            Ok(n)
+        }
+    }
+    let json = r#"{"a\"//": 1 /* c */}"#;
+    let mut out = String::new();
+    StripComments::new(OneByte(json.as_bytes())).read_to_string(&mut out).unwrap();
+    assert_eq!(out, r#"{"a\"//": 1        }"#);
+}
