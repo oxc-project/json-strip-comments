@@ -100,9 +100,13 @@ where
     }
 }
 
-/// Strips comments from a string in place, replacing it with whitespaces.
+/// Strips comments and trailing commas from a string in place, replacing them with whitespace.
 ///
-/// /// ## Example
+/// # Errors
+///
+/// Returns [`ErrorKind::InvalidData`] if a `/` is not followed by `/` or `*`.
+///
+/// ## Example
 /// ```
 /// use json_strip_comments::strip_comments_in_place;
 ///
@@ -121,15 +125,26 @@ where
 /// ```
 #[inline]
 pub fn strip_comments_in_place(s: &mut str) -> Result<()> {
-    // Safety: we have made sure the text is UTF-8
+    // SAFETY: only ASCII bytes are ever replaced, and they are replaced with ASCII spaces.
+    // A UTF-8 multi-byte sequence never contains ASCII bytes, so the result is valid UTF-8.
     strip_buf(&mut Top, unsafe { s.as_bytes_mut() })
 }
 
+/// Alias of [`strip_comments_in_place`].
+///
+/// # Errors
+///
+/// See [`strip_comments_in_place`].
 #[inline]
 pub fn strip(s: &mut str) -> Result<()> {
     strip_comments_in_place(s)
 }
 
+/// Strips comments and trailing commas from a byte slice in place, replacing them with whitespace.
+///
+/// # Errors
+///
+/// See [`strip_comments_in_place`].
 #[inline]
 pub fn strip_slice(s: &mut [u8]) -> Result<()> {
     strip_buf(&mut Top, s)
@@ -169,7 +184,6 @@ fn strip_buf(state: &mut State, buf: &mut [u8]) -> Result<()> {
     let mut i = 0;
     let len = buf.len();
 
-    // Fast path for Top state which is most common
     while i < len {
         let c = &mut buf[i];
 

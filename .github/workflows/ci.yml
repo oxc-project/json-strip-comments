@@ -23,9 +23,11 @@ jobs:
       - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
         with:
           save-cache: ${{ github.ref_name == 'main' }}
-          components: clippy
-      - run: cargo check
-      - run: cargo clippy
+          components: clippy rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo check --all-targets
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
       - run: RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --document-private-items
 
   test-wasm32-unknown-unknown:
